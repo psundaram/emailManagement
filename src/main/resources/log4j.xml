@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
+    <appender name="console" class="org.apache.log4j.ConsoleAppender">
+        <param name="Target" value="System.out"/>
+        <param name="Threshold" value="info"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d{ISO8601} %-5p [%c{1}] - %m%n"/>
+        </layout>
+    </appender>
+
+    <appender name="debugLogfile" class="org.apache.log4j.RollingFileAppender">
+        <param name="file" value="/apps/logs/email.log"/>
+        <param name="MaxFileSize" value="10MB"/>
+        <param name="MaxBackupIndex" value="100"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d{ISO8601} %-5p [%c{1}] - %m%n"/>
+        </layout>
+    </appender>
+
+    <appender name="FILE_HIBERNATE" class="org.apache.log4j.RollingFileAppender">
+        <param name="File" value="/apps/logs/email.log"/>
+        <param name="Append" value="false"/>
+        <param name="Threshold" value="TRACE"/>
+        <!-- Rollover at midnight each day -->
+        <param name="DatePattern" value="'.'yyyy-MM-dd"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d %-5p [%c] %m%n"/>
+        </layout>
+    </appender>
+
+    <appender name="SQLROLLINGFILE" class="org.apache.log4j.RollingFileAppender">
+        <param name="file" value="/apps/logs/email.log"/>
+        <param name="MaxFileSize" value="10MB"/>
+        <param name="MaxBackupIndex" value="100"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d{ISO8601} %-5p [%c{1}] - %m%n"/>
+        </layout>
+    </appender>
+
+
+    <!-- Prod Settings -->
+    <logger name="org.hibernate.SQL" additivity="false" >
+        <level value="INFO" />
+        <appender-ref ref="SQLROLLINGFILE" />
+    </logger>
+
+    <logger name="org.hibernate.type" additivity="false" >
+        <level value="INFO" />
+        <appender-ref ref="SQLROLLINGFILE" />
+    </logger>
+
+    <logger name="org.hibernate.type">
+        <level value="INFO"/>
+        <appender-ref ref="FILE_HIBERNATE"/>
+    </logger>
+
+    <logger name="org.hibernate.SQL">
+        <level value="INFO"/>
+        <appender-ref ref="FILE_HIBERNATE"/>
+    </logger>
+
+    <logger name="org.hibernate.type.descriptor.sql.BasicBinder">
+        <level value="INFO"/>
+        <appender-ref ref="FILE_HIBERNATE"/>
+    </logger>
+
+    <root>
+        <priority value ="INFO" />
+        <appender-ref ref="debugLogfile" />
+         <appender-ref ref="console" />
+    </root>
+
+</log4j:configuration>
