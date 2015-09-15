@@ -27,34 +27,28 @@ import com.google.common.base.Strings;
 
 
 /**
- * Provides relayEmail implementation for generating content,insert in email logs,update logger table and generate query
+ * Provides relayEmail implementation for generating content,insert in email
+ * logs,update logger table and generate query
  */
 @Service
 public class RelayEmailDAO {
 
-	/** Logging for RelayEmailDAO */
 	private static final Logger logger = Logger.getLogger(RelayEmailDAO.class);
 
 	
 	/**
 	 * Tag value in content and subject are replaced with appropriate value from
 	 * API call, Tag map or relay email.
-	 * @param elementsForMessage the elements for message
-	 * @param configMap the config map
-	 * @return the string of final subject and content
-	 * @throws SQLException 
-	 * @throws JSONException 
-	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public String generateActualContent(HashMap<String, String> elementsForMessage, HashMap<String, String> configMap) throws SQLException, JSONException, IOException {
-		System.out.println("Entering generateActualContent");
+	public String generateActualContent(Map<String, String> elementsForMessage, Map<String, String> configMap) throws SQLException, JSONException, IOException {
 		logger.info("Entering generateActualContent");
-		String content = null;
-		String subject = null;
-		String query = null;
-		List<String> tagsUsedList = null;
-		HashMap<String, String> apiMap = new HashMap<String,String>();
-//		HashMap<String,String> legacyMap = new HashMap<String,String>();
+		
+		String						content			= null;
+		String						subject			= null;
+		String						query			= null;
+		List<String>				tagsUsedList	= null;
+		Map<String, String>			apiMap			= new HashMap<String, String>();
+		
 		if (!configMap.isEmpty()) {
 			subject = StringEscapeUtils.unescapeHtml(configMap.get("subject"));
 			content = StringEscapeUtils.unescapeHtml(configMap.get("content_template"));
@@ -76,8 +70,8 @@ public class RelayEmailDAO {
 		if (configMap.containsKey("signature") && (null != configMap.get("signature")) && (!configMap.get("signature").isEmpty()) && (!(configMap.get("signature").trim().equals("")))
 				&& (!(configMap.get("signature").trim().contains("generated")))) {
 			String signature = StringEscapeUtils.unescapeHtml(configMap.get("signature"));
-			Pattern p = Pattern.compile("$");
-			Matcher matcher = p.matcher(signature);
+			Pattern pattern = Pattern.compile("$");
+			Matcher matcher = pattern.matcher(signature);
 			while (matcher.find()) {
 				signature = signature.replaceAll("\\$", "\\\\\\$");
 			}
@@ -106,7 +100,7 @@ public class RelayEmailDAO {
 						logger.info("tagName:" + tagName);
 						String replacedValue = "";
 						// Tags used condition
-						if (tagsUsedList != null && tagsUsedList.size() > 0) {
+						if (tagsUsedList != null && !tagsUsedList.isEmpty()) {
 							if (!tagsUsedList.contains(tagName)) {
 								content = content.replaceAll("<<." + tagName + ">>", "");
 								subject = subject.replaceAll("<<." + tagName + ">>", "");
@@ -139,8 +133,8 @@ public class RelayEmailDAO {
 						else if (tagMap.containsKey(tagName) && (null != tagMapDTO.getTagValue())  && (!("null".equalsIgnoreCase(tagMapDTO.getTagValue())))
 								&& (!("".equalsIgnoreCase(tagMapDTO.getTagValue().trim())))) {
 							String temp =  StringEscapeUtils.unescapeHtml(tagMapDTO.getTagValue());
-							Pattern p = Pattern.compile("$");
-							Matcher matcher = p.matcher(temp);
+							Pattern pattern = Pattern.compile("$");
+							Matcher matcher = pattern.matcher(temp);
 							while (matcher.find()) {
 								temp = temp.replaceAll("\\$", "\\\\\\$");
 							}
@@ -149,8 +143,8 @@ public class RelayEmailDAO {
 						else if ((elementsForMessage.containsKey(tagName) && (null != elementsForMessage.get(tagName)) && (!("null".equalsIgnoreCase(elementsForMessage.get(tagName)))) && (!(""
 								.equalsIgnoreCase(elementsForMessage.get(tagName).trim()))))) {
 							String temp = StringEscapeUtils.unescapeHtml(elementsForMessage.get(tagName));
-							Pattern p = Pattern.compile("$");
-							Matcher matcher = p.matcher(temp);
+							Pattern pattern = Pattern.compile("$");
+							Matcher matcher = pattern.matcher(temp);
 							while (matcher.find()) {
 								temp = temp.replaceAll("\\$", "\\\\\\$");
 							}
@@ -185,82 +179,100 @@ public class RelayEmailDAO {
 	 * @throws Exception 
 	 */
 	
-	public HashMap<String, String> generateMultiQueryStringToObtainConfig(boolean queryParamForSetID, String setId, String emailName) throws Exception {
+	public Map<String, String> generateMultiQueryStringToObtainConfig(boolean isSetID, String setId, String emailName) throws Exception  {
 		logger.info("Entering generateMultiQueryStringToObtainConfig --> SetId,emailName " + setId + " , " + emailName);
 		
-		HashMap<String, String>	configMap	= new HashMap<String, String>();
-		String					q1			= null;
-		String					q2			= null;
-		String					partnerType	= null;
-		HashMap<String, String>	partnerMap	= new HashMap<String, String>();
+		Map<String, String>	configMap	= new HashMap<String, String>();
+		Map<String, String>	partnerMap	= new HashMap<String, String>();
 
-		// Retrieve partner information from partner API (published status, parent_partner_id,etc..)
-		if(queryParamForSetID)
-			partnerMap = URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+"partners?partner_id="+setId);
-		else
-			partnerMap = URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+"partners?id="+setId);
+		/* Retrieve partner information from partner API (published status, parent_partner_id,etc..) */
+		if (isSetID) {
+			partnerMap = URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+ "partners?partner_id=" + setId);
+		}
+		else {
+			partnerMap = URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+ "partners?id=" + setId);
+		}
 		
 		if(partnerMap!=null && !partnerMap.isEmpty()){
 			
-			String partnerId = null;
-			// If channel partner, apply configuration of parent partner
-			if(partnerMap.containsKey("partner_type") && !Strings.isNullOrEmpty(partnerMap.get("partner_type")) && (partnerMap.get("partner_type").equals("2")) && partnerMap.containsKey("parent_partner_id") && !Strings.isNullOrEmpty(partnerMap.get("parent_partner_id"))){
-				partnerType = partnerMap.get("partner_type");
-				logger.info("Inside channel Partner");
-				System.out.println("Inside channel partner");
-				partnerId = partnerMap.get("parent_partner_id").toString();
-				System.out.println("channel partnerMAp " + partnerMap);
-				partnerMap = URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+"partners?id="+partnerId);
-				System.out.println("Parent partner details : " + partnerMap);
-				// If partner is non-published, generic config SetID = "*****"
-				if(partnerMap.containsKey("is_published") && (Strings.isNullOrEmpty(partnerMap.get("is_published")) || partnerMap.get("is_published").equals("0"))){
-					String setID = Constants.DUMMY_PARTNER_ID;
-					q1 = "select * from email_configs_vw where setId='" + setID + "' and email_name='" + emailName + "'  AND customer_id=-1";
-					q2 = "select cc_email,reply_to_email from email_configs_opt_vw where setId='" + setID + "' AND email_name='" + emailName + "'  AND customer_id=-1";
-				}else{
-					q1 = "select * from email_configs_vw where partner_id='" + partnerId + "' and email_name='" + emailName + "'  AND customer_id=-1";
-					q2 = "select cc_email,reply_to_email from email_configs_opt_vw where partner_id='" + partnerId + "' AND email_name='" + emailName + "'  AND customer_id=-1";
-				}
-			}// If WS partner is non-published, generic config for setId as "*****"
-			else if(partnerMap.containsKey("is_published") && (Strings.isNullOrEmpty(partnerMap.get("is_published")) || partnerMap.get("is_published").equals("0"))){
-				String setID = Constants.DUMMY_PARTNER_ID;
-				partnerId = partnerMap.get("id").toString();
-				q1 = "select * from email_configs_vw where setId='" + setID + "' and email_name='" + emailName + "'  AND customer_id=-1";
-				q2 = "select cc_email,reply_to_email from email_configs_opt_vw where setId='" + setID + "' AND email_name='" + emailName + "'  AND customer_id=-1";
-			}
-			else{
-				partnerId = partnerMap.get("id").toString();
-				q1 = "select * from email_configs_vw where partner_id='" + partnerId + "' and email_name='" + emailName + "'  AND customer_id=-1";
-				q2 = "select cc_email,reply_to_email from email_configs_opt_vw where partner_id='" + partnerId + "' AND email_name='" + emailName + "'  AND customer_id=-1";
-			}
-			String query = q1 + "###" + q2;
-			configMap = new DbConnect().getConfigsFromMultipleQuery(query.split("###"));
+			configMap = getConfig(partnerMap, emailName, setId);
+			
 			if(configMap!=null && !configMap.isEmpty()){
-				configMap.put("is_published",partnerMap.get("is_published"));
-				// Setting partner smtp information
-				configMap.put("smtp_applicable", partnerMap.get("smtp_applicable"));
-				configMap.put("smtp_server", partnerMap.get("smtp_server"));
-				configMap.put("user_name", partnerMap.get("user_name"));
-				configMap.put("password", partnerMap.get("password"));
-				configMap.put("port", partnerMap.get("port"));
-				configMap.put("account_manager", partnerMap.get("account_manager"));
-				configMap.put("actual_partner_id",partnerId);
-				configMap.put("partner_type", partnerType);
+				
+				/* Setting partner smtp information */
+				configMap.put("smtp_applicable", getValueForMap(partnerMap,"smtp_applicable"));
+				configMap.put("smtp_server",getValueForMap(partnerMap,"smtp_server"));
+				configMap.put("user_name", getValueForMap(partnerMap,"user_name"));
+				configMap.put("password", getValueForMap(partnerMap,"password"));
+				configMap.put("port", getValueForMap(partnerMap,"port"));
+				configMap.put("account_manager", getValueForMap(partnerMap,"account_manager"));
+				configMap.put("is_published",getValueForMap(partnerMap,"is_published"));
 			}
 		}
 		
-		System.out.println("Exiting generateMultiQueryStringToObtainConfig"  + configMap);
-		logger.info("Exiting generateMultiQueryStringToObtainConfig");
+		logger.info("Exiting generateMultiQueryStringToObtainConfig" + configMap);
 		return configMap;
 	}
 
-
+ 
+	public Map<String, String> getConfig(Map<String, String> partnerMap,String emailName,String setId) throws Exception {
+		
+		Map<String, String>	configMap	= new HashMap<String, String>();
+		String 					partnerId  	= null;
+		String 					setID 		= null;			
+		String					partnerType = getValueForMap(partnerMap, "partner_type");
+		String					parentId 	= getValueForMap(partnerMap, "parent_partner_id");
+		String 					isPublished = getValueForMap(partnerMap, "is_published");
+		
+		/* If channel partner, apply configuration of parent partner */
+		if (!Strings.isNullOrEmpty(partnerType) && (partnerType.equals("2"))
+				&& !Strings.isNullOrEmpty(parentId)) {
+			logger.info("Inside channel Partner");
+			
+			partnerId	 	= parentId;
+			partnerMap 		= URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+ "partners?id=" + partnerId);
+			setID 			= getValueForMap(partnerMap, "partner_id");
+			
+			// If partner is non-published, generic config SetID = "*****"
+			if ((Strings.isNullOrEmpty(isPublished) || isPublished.equals("0"))) {
+				setID = Constants.DUMMY_PARTNER_ID;
+			}
+		}
+		
+		/* If WS partner is non-published, generic config for setId as "*****" */
+		else if ((Strings.isNullOrEmpty(isPublished) || isPublished.equals("0"))) {
+			setID 		= Constants.DUMMY_PARTNER_ID;
+			partnerId 	= partnerMap.get("id").toString();
+		}
+		
+		else {
+			setID 		= partnerMap.get("");
+			partnerId 	= getValueForMap(partnerMap, "partner_id");
+		}
+		
+		logger.info("SetID:" + setID + "partnerId:" + partnerId);
+		
+		String 	query1 	= "select * from email_configs_vw where setId='" + setID + "' and email_name='" + emailName + "'  AND customer_id=-1";
+		String	query2 	= "select cc_email,reply_to_email from email_configs_opt_vw where setId='" + setID + "' AND email_name='" + emailName + "'  AND customer_id=-1";
+		String 	query 	= query1 + "###" + query2;
+		
+		configMap = new DbConnect().getConfigsFromMultipleQuery(query.split("###"));
+		
+		if(configMap!=null && !configMap.isEmpty()){
+			configMap.put("actual_partner_id",partnerId);
+			configMap.put("partner_type", partnerType);
+		}
+		
+		return configMap;
+	}
+	
+	
 	/**
 	 * Insert into email_logs.
 	 * @param parameterMap the hashmap of key,values to be inserted in email_logs
 	 * @return the id 
 	 */
-	public int insert(HashMap<String, String> parameterMap) {
+	public int insert(Map<String, String> parameterMap) {
 		logger.info("Entering insert");
 		
 		String	columns	= "";
@@ -271,8 +283,8 @@ public class RelayEmailDAO {
 			val 		+= "'" + parameterMap.get(key) + "'" + ",";
 		}
 		
-		columns 		= columns.substring(0, columns.lastIndexOf(","));
-		val 			= val.substring(0, val.lastIndexOf(","));
+		columns 		= columns.substring(0, columns.lastIndexOf(','));
+		val 			= val.substring(0, val.lastIndexOf(','));
 		
 		String sql = "INSERT INTO email_logs (" + columns + ") VALUES (" + val + ");";
 		
@@ -285,9 +297,9 @@ public class RelayEmailDAO {
 	 * Updates sending status from created to sent.
 	 * @param id the id
 	 */
-	public void updateLogger(int id) {
+	public void updateLogger(int emailId) {
 		
-		String sql = "UPDATE email_logs SET sending_status='Sent' WHERE id=" + id;
+		String sql = "UPDATE email_logs SET sending_status='Sent' WHERE id=" + emailId;
 		new DbConnect().updateLogs(sql);
 	
 	}
@@ -295,14 +307,12 @@ public class RelayEmailDAO {
 
 	/**
 	 * Increments resend count in email_logs.
-	 * @param id the id
-	 * @param count the count of resend triggered for the id 
 	 */
-	public void updateLogsForResend(int id, int count) {
+	public void updateLogsForResend(int emailId, int count) {
 		logger.info("Entering updateLogsForResend==>" + count);
 		
-		int actualResendCount = count + 1;
-		String sql = "UPDATE email_logs SET resend_count=" + actualResendCount + " WHERE id=" + id;
+		int resendCount = count + 1;
+		String sql = "UPDATE email_logs SET resend_count=" + resendCount + " WHERE id=" + emailId;
 		
 		logger.info("Exiting updateLogsForResend");
 		new DbConnect().updateResendCount(sql);
@@ -312,54 +322,66 @@ public class RelayEmailDAO {
 	/**
 	 * Query to fetch email contents for resend.
 	 */
-	public Map<String, String> generateQueryForResend(String pid) throws SQLException {
-		logger.info("Entering generateQueryForResend==>" + pid);
+	public Map<String, String> generateQueryForResend(String emailId) throws SQLException {
+		logger.info("Entering generateQueryForResend==>" + emailId);
 		
-		String query = "select * from email_logs where id='" + pid + "'";
+		String query = "select * from email_logs where id='" + emailId + "'";
 		
 		logger.info("Exiting generateQueryForResend");
 		return new DbConnect().getConfigsFromSingleQuery(query);
 	}
 
 	
-	public HashMap<String, String> getConfigForOrderId(String orderId, String emailName)
+	public Map<String, String> getConfigForOrderId(String orderId, String emailName)
 			throws SQLException {
 		logger.info("Entering generateMultiQueryStringToObtainConfig --> orderId,emailName "
 				+ orderId + " , " + emailName);
 		
-		String q1 = "select * from email_configs_vw where order_id='" + orderId
+		String query1 = "select * from email_configs_vw where order_id='" + orderId
 				+ "' AND email_name='" + emailName + "'";
 		
-		String q2 = "select cc_email,reply_to_email from email_configs_opt_vw where order_id='"
+		String query2 = "select cc_email,reply_to_email from email_configs_opt_vw where order_id='"
 				+ orderId + "' AND email_name='" + emailName + "'";
 		
-		String query = q1 + "###" + q2;
+		String query = query1 + "###" + query2;
 		
 		logger.info("Exiting generateMultiQueryStringToObtainConfig");
 		
-		HashMap<String, String> result = new DbConnect().getConfigsFromMultipleQuery(query
+		Map<String, String> result = new DbConnect().getConfigsFromMultipleQuery(query
 				.split("###"));
 		return result;
 	}
 
 	
-	public HashMap<String, String> getConfigForCustomerId(String customerId, String emailName)
+	public Map<String, String> getConfigForCustomerId(String customerId, String emailName)
 			throws SQLException {
 		logger.info("Entering generateMultiQueryStringToObtainConfig --> customerId,emailName "
 				+ customerId + " , " + emailName);
 		
-		String q1 = "select * from email_configs_vw where customer_id='" + customerId
+		String query1 = "select * from email_configs_vw where customer_id='" + customerId
 				+ "' AND email_name='" + emailName + "'  AND order_id=-1";
 		
-		String q2 = "select cc_email,reply_to_email from email_configs_opt_vw where customer_id='"
+		String query2 = "select cc_email,reply_to_email from email_configs_opt_vw where customer_id='"
 				+ customerId + "' AND email_name='" + emailName + "' AND order_id=-1";
 		
-		String query = q1 + "###" + q2;
+		String query = query1 + "###" + query2;
 		
 		logger.info("Exiting generateMultiQueryStringToObtainConfig");
 		
-		HashMap<String, String> result = new DbConnect().getConfigsFromMultipleQuery(query
+		Map<String, String> result = new DbConnect().getConfigsFromMultipleQuery(query
 				.split("###"));
 		return result;
+	}
+	
+	
+	public String getValueForMap(Map<String, String> map,String key) {
+		
+		String	value	= "";
+		
+		if (map.containsKey(key) && !Strings.isNullOrEmpty(map.get(key))) {
+			value =  map.get(key);
+		}
+		
+		return value;
 	}
 }
