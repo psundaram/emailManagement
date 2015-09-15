@@ -39,7 +39,6 @@ import org.springframework.stereotype.Component;
 
 import com.anpi.app.constants.Constants;
 import com.anpi.app.domain.EmailCredits;
-import com.anpi.app.service.RelayEmail;
 import com.anpi.app.service.RelayEmailDAO;
 import com.anpi.app.util.CommonUtil;
 import com.anpi.app.util.URLReaderUtil;
@@ -49,7 +48,7 @@ import com.google.common.base.Strings;
 @Component
 public class ReadEmail {
 	
-	private static final Logger		logger						= Logger.getLogger(RelayEmail.class);
+	private static final Logger		logger						= Logger.getLogger(ReadEmail.class);
 	
 	RelayEmailDAO					relayEmailDAO				= new RelayEmailDAO();
 	public Session					emailSession				= null;

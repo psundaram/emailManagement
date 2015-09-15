@@ -23,9 +23,8 @@ public class CommonUtil
 {
 
 	private static final Logger	logger	= Logger.getLogger(CommonUtil.class);
-	
-	
 
+	
 	/**
 	 * Convert Date to utc string.
 	 */
@@ -33,30 +32,26 @@ public class CommonUtil
 	{
 		DateTime dt = new DateTime(new Date());
 		dt = dt.withZone(DateTimeZone.forID("UTC"));
-		System.out.println("UTC Date in String: "
-				+ dt.toString("yyyy-MM-dd HH:mm:ss"));
+		
+		logger.info("UTC Date in String: " + dt.toString("yyyy-MM-dd HH:mm:ss"));
 		return dt.toString("yyyy-MM-dd HH:mm:ss");
 	}
 
+	
 	/**
 	 * This method would print FROM,TO and SUBJECT of the message
-	 * 
-	 * @param m
-	 *            the Message object
-	 * @throws Exception
-	 *             the exception
 	 */
 	public static void writeEnvelope(Message m) throws Exception
 	{
-		System.out.println("This is the message envelope");
-		System.out.println("---------------------------");
+		logger.info("This is the message envelope");
+		logger.info("---------------------------");
 		Address[] a;
 		// FROM
 		if ((a = m.getFrom()) != null)
 		{
 			for (int j = 0; j < a.length; j++)
 			{
-				System.out.println("FROM: " + a[j].toString());
+				logger.info("FROM: " + a[j].toString());
 			}
 		}
 		// TO
@@ -64,22 +59,19 @@ public class CommonUtil
 		{
 			for (int j = 0; j < a.length; j++)
 			{
-				System.out.println("TO: " + a[j].toString());
+				logger.info("TO: " + a[j].toString());
 			}
 		}
 		// SUBJECT
 		if (m.getSubject() != null)
 		{
-			System.out.println("SUBJECT: " + m.getSubject());
+			logger.info("SUBJECT: " + m.getSubject());
 		}
 	}
 
+	
 	/**
 	 * Gets the string from input stream.
-	 * 
-	 * @param is
-	 *            the inputStream
-	 * @return the string from input stream
 	 */
 	public static String getStringFromInputStream(InputStream is)
 	{
@@ -115,12 +107,9 @@ public class CommonUtil
 		return sb.toString();
 	}
 
+	
 	/**
 	 * Convert to csv.
-	 * 
-	 * @param alist
-	 *            the arraylist of strings
-	 * @return the string
 	 */
 	public static String convertToCsv(ArrayList<String> alist)
 	{
@@ -136,16 +125,12 @@ public class CommonUtil
 				returnThis = returnThis + "," + str;
 			}
 		}
-		// returnThis = returnThis.substring(0, returnThis.lastIndexOf(","));
 		return returnThis;
 	}
 
+	
 	/**
 	 * Convert to csv.
-	 * 
-	 * @param alist
-	 *            the list of strings
-	 * @return the string
 	 */
 	public static String convertToCsv(LinkedList<String> alist)
 	{
@@ -161,66 +146,59 @@ public class CommonUtil
 				returnThis = returnThis + "," + str;
 			}
 		}
-		// returnThis = returnThis.substring(0, returnThis.lastIndexOf(","));
 		return returnThis;
 	}
 
+	
 	/**
-	 * Extract email address from the String.
-	 * 
-	 * @param text
-	 *            the String
-	 * @return the email Address string
+	 * Extract email address from the html string.
 	 */
-	public static String extractAddr(String text)
-	{
-		System.out.println("Entering Email Util" + text);
+	public static String extractAddr(String text) {
 		logger.info("Entering Email Util" + text);
-		String addrStr = "";
-		Pattern p = Pattern.compile(
-				"\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,4}\\b",
-				Pattern.CASE_INSENSITIVE);
-		Matcher matcher = p.matcher(text);
-		int count = 0;
-		while (matcher.find())
-		{
-			// System.out.println("matcher-"+matcher.group());
+
+		String	addrStr	= "";
+		Pattern	p		= Pattern.compile("\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,4}\\b",
+								Pattern.CASE_INSENSITIVE);
+		Matcher	matcher	= p.matcher(text);
+		int		count	= 0;
+		
+		while (matcher.find()) {
 			addrStr += (matcher.group() + ";");
 			count++;
 		}
-		System.out.println("Count" + count);
-		if (count == 1)
-		{
+		
+		logger.info("Count" + count);
+		if (count == 1) {
 			addrStr = addrStr.replaceAll(";", " ");
 		}
-		System.out.println("addStr-" + addrStr);
-		logger.info("addStr-" + addrStr);
-		System.out.println("Exiting Email Util");
-		logger.info("Exiting Email Util");
+		
+		logger.info("Exiting Email Util" + addrStr) ;
 		return addrStr;
 	}
+	
 
 	/**
 	 * This method formats the phone number
 	 * 
 	 * @param phoneNumber
-	 *            the phone number
+	 *            the phone number to be formated
 	 * @return the formatted phone number
 	 */
 	public static String formatNumber(String phoneNumber, String delimiter)
 	{
 		String[] phoneNumberArr = phoneNumber.split(",");
 		String finalPhoneNumber = "";
+		
 		for (int i = 0; i < phoneNumberArr.length; i++)
 		{
-			String phoneFmt = phoneNumberArr[i];
-			String formattedNumber = "";
-			Pattern p = Pattern.compile(("\\d+\\.?"));
-			Matcher m = p.matcher(phoneNumberArr[i]);
+			String	phoneFmt		= phoneNumberArr[i];
+			String	formattedNumber	= "";
+			Pattern	p				= Pattern.compile(("\\d+\\.?"));
+			Matcher	m				= p.matcher(phoneNumberArr[i]);
 			if (m.matches())
 			{
-				System.out
-						.println("Format phone Number-->" + phoneNumberArr[i]);
+				logger.info("Format phone Number-->" + phoneNumberArr[i]);
+				
 				if (phoneFmt.length() == 10)
 				{
 					formattedNumber = String.format("(%s) %s-%s",
@@ -238,32 +216,31 @@ public class CommonUtil
 					formattedNumber = phoneFmt;
 				}
 			}
-			else
-			{
+			else {
 				formattedNumber = phoneFmt;
 			}
-			if (i == 0)
-			{
+			if (i == 0) {
 				finalPhoneNumber = formattedNumber;
 			}
-			else
-			{
+			else {
 				finalPhoneNumber += delimiter + formattedNumber;
 			}
 		}
-		System.out.println(finalPhoneNumber);
 		logger.info(finalPhoneNumber);
+		
 		return finalPhoneNumber;
 	}
 
+	
+	/** Parse address from Address object */
 	public static String getAddressFromMessage(Address[] addressArr) {
-		String addressStr = "";
+		String 		 addressStr  = "";
 		List<String> addressList = new ArrayList<String>();
+		
 		if (addressArr != null)
 		{
 			for (Address address : addressArr)
 			{
-				System.out.println("ccAddress:" + CommonUtil.extractAddr(address.toString()));
 				addressList.add(extractAddr(address.toString()));
 			}
 			addressStr = StringUtils.collectionToCommaDelimitedString(addressList);

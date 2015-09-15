@@ -163,7 +163,7 @@ public class RelayEmailDAO {
 	}
 
 	
-	/* Replace dollar sign */
+	/** Replace dollar sign */
 	private static String replaceDollarSign(String value) {
 		String replacedValue = "";
 		Pattern pattern = Pattern.compile("$");
