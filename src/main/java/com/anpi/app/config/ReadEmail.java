@@ -55,12 +55,12 @@ public class ReadEmail {
 	public Session					emailSession				= null;
 	public String					messageContentFinal			= null;
 	public Message					newMessage					= null;
-	public HashMap<String, String>	configMap					= null;
+	public Map<String, String>		configMap					= null;
 	public ArrayList<String>		filesToBeDeleted			= null;
 	public LinkedList<String>		fileNames					= null;
 	public Message					messageToBeSent				= null;
 	public Message					messageWithoutAttachment	= null;
-	public HashMap<String, String>	elementsForMessage			= null;
+	public Map<String, String>		elementsForMessage			= null;
 	public ArrayList<String>		uploadedUuids				= new ArrayList<String>();
 
 	
@@ -325,7 +325,7 @@ public class ReadEmail {
 	/**
 	 *  Look for configuration based on email name and then compose message
 	 */
-	public void getConfiguration(HashMap<String, String> elementsForMessage)
+	public void getConfiguration(Map<String, String> elementsForMessage)
 			throws Exception {
 		
 		logger.info("Entering createNoAttachmentMessage");
@@ -381,7 +381,7 @@ public class ReadEmail {
 		logger.info("Entering addLogger");
 		
 		/* Generate the map for the logs to be added.*/
-		HashMap<String, String> parameterMap = createLoggerMap(elementsForMessage, configMap,newMessage);
+		Map<String, String> 	parameterMap = createLoggerMap(elementsForMessage, configMap,newMessage);
 		int 					insertId 	 = relayEmailDAO.insert(parameterMap);
 		
 		logger.info("Exiting addLogger --> " + insertId);
@@ -394,10 +394,10 @@ public class ReadEmail {
 	 * Reads the values from relay and config table and insert values into
 	 * email_logs table.
 	 */
-	public HashMap<String, String> createLoggerMap(HashMap<String, String> elementsForMessage, HashMap<String, String> configMap, Message newMessage) throws MessagingException {
+	public Map<String, String> createLoggerMap(Map<String, String> elementsForMessage, Map<String, String> configMap, Message newMessage) throws MessagingException {
 		logger.info("Entering createLoggerMap");
 		
-		HashMap<String, String>	parameterMap	= new HashMap<String, String>();
+		Map<String, String>		parameterMap	= new HashMap<String, String>();
 		String					signature		= null;
 		String					content			= null;
 		String					partnerId		= null;
@@ -502,7 +502,7 @@ public class ReadEmail {
 	/**
 	 * Compose email message based on the relay message and database.
 	 */
-	public Message createMessage(Message message,HashMap<String, String> elementsForMessage, HashMap<String, String> configMap) throws Exception {
+	public Message createMessage(Message message,Map<String, String> elementsForMessage, Map<String, String> configMap) throws Exception {
 		logger.info("Entering createMessageOnly");
 		
 		String	content		= null;
