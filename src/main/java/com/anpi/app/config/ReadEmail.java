@@ -563,17 +563,17 @@ public class ReadEmail {
 			newMessage.setRecipients(Message.RecipientType.BCC,
 					InternetAddress.parse(Constants.BCC_EMAIL_ADDRESS));
 			
-			String generatedString = relayEmailDAO.generateActualContent(elementsForMessage, configMap);
+			String[] generatedString = relayEmailDAO.generateActualContent(elementsForMessage, configMap);
 			
 			if (!Strings.isNullOrEmpty(getValueForConfig("subject"))) {
-				String subject = generatedString.split("##")[0].toString();
+				String subject = generatedString[0].toString();
 				newMessage.setSubject(StringEscapeUtils.unescapeHtml(subject));
 			}
 			else {
 				newMessage.setSubject(StringEscapeUtils.unescapeHtml(getValueForElementsMap("Subject")));
 			}
 			
-			content = generatedString.split("##")[1].toString();
+			content = generatedString[1].toString();
 		}
 		
 		Document doc = Jsoup.parse(content);

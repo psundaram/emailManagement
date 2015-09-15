@@ -34,84 +34,65 @@ public class URLReaderUtil {
 	 *
 	 * @param partnerId the partner id
 	 * @return the input from url
-	 * @throws IOException Signals that an I/O exception has occurred.
-	 * @throws JSONException the jSON exception
 	 */
+	
+
 	public static Map<String, String> getInputFromUrl(String url) throws IOException, JSONException {
-		System.out.println("Entering getInputFromUrl");
 		logger.info("Entering getInputFromUrl");
-//		String address = Constants.API_CALL_URL+partnerId;
-		InputStream is = new URL(url).openStream();
-		JSONObject json = getJSONFromInputStream(is);
-		Map<String, String> listOfParameter = new HashMap<String, String>();
-		Gson gson = new Gson();
-		Type collectionType = new TypeToken<Map<String, String>>() {
-		}.getType();
-		Map<String, String> listOfParameterTest = gson.fromJson(json.toString(), collectionType);
+		
+		Map<String, String>			listOfParameter		= new HashMap<String, String>();
+		Gson						gson				= new Gson();
+		Type						collectionType		= new TypeToken<Map<String, String>>() {}.getType();
+
+		InputStream					is					= new URL(url).openStream();
+		JSONObject					json				= getJSONFromInputStream(is);
+		Map<String, String>			listOfParameterTest	= gson.fromJson(json.toString(), collectionType);
 
 		listOfParameter.putAll(listOfParameterTest);
-		System.out.println("Exiting getInputFromUrl-->"+listOfParameter);
+		
 		logger.info("Exiting getInputFromUrl-->"+listOfParameter);
 		return listOfParameter;
 	}
 	
-	
-	
-	public static net.sf.json.JSONObject getJSONFromInputStream(
-			InputStream inputStream) throws IOException
-	{
+	public static net.sf.json.JSONObject getJSONFromInputStream(InputStream inputStream)
+			throws IOException {
+		
 		StringBuilder			sb		= new StringBuilder();
 		net.sf.json.JSONObject	jsonO	= null;
 		String					line	= null;
 		
-		InputStreamReader reader 		= new InputStreamReader(inputStream);
-		BufferedReader in			    = new BufferedReader(reader);
+		InputStreamReader		reader	= new InputStreamReader(inputStream);
+		BufferedReader			in		= new BufferedReader(reader);
 		
-		while ((line = in.readLine()) != null)
-		{
+		while ((line = in.readLine()) != null) {
 			sb.append(line);
 		}
-		
 		jsonO = net.sf.json.JSONObject.fromObject(sb.toString());
 		return jsonO;
 	}
 
 	
-	public static HashMap<String, String> getJsonFromUrl(String url) throws MalformedURLException, IOException, ParseException
-			
+	public static Map<String, String> getJsonFromUrl(String url) throws MalformedURLException, IOException, ParseException
 	{
-		
-		HashMap<String, String>	listOfParameter	= new HashMap<String, String>();
+		Map<String, String>		listOfParameter	= new HashMap<String, String>();
 		Gson					gson			= new Gson();
 		Type					collectionType	= new TypeToken<HashMap<String, String>>() {}.getType();
 												
-		System.out.println("Entering URL Util - Read Json --> " + url);
 		logger.info("Entering URL Util - Read Json --> " + url);
 		
-		InputStream is = new URL(url).openStream();
-		String json = IOUtils.toString(is);
-		JSONArray jsonArray = (JSONArray) JSONValue.parseWithException(json);
+		InputStream	is			= new URL(url).openStream();
+		String		json		= IOUtils.toString(is);
+		JSONArray	jsonArray	= (JSONArray) JSONValue.parseWithException(json);
 		
 		if (jsonArray != null && jsonArray.size() > 0)
 		{
-			org.json.simple.JSONObject jsonObject = (org.json.simple.JSONObject) jsonArray.get(0);
+			org.json.simple.JSONObject jsonObject 	= (org.json.simple.JSONObject) jsonArray.get(0);
 			Map<String, String> listOfParameterTest = gson.fromJson(jsonObject.toString(), collectionType);
 			listOfParameter.putAll(listOfParameterTest);
 		}
-		System.out.println("Exiting URL Util - Read Json-->" + listOfParameter);
+		
 		logger.info("Exiting URL Util - Read Json-->" + listOfParameter);
 		return listOfParameter;
 	}
 	
-	
-	/**
-	 * The main method.
-	 *
-	 * @param args the arguments
-	 * @throws Exception 
-	 */
-	public static void main(String args[]) throws Exception {
-		getJsonFromUrl("http://10.5.3.233:8080/partner/api/partners?id=1");
-		System.out.println("" + getInputFromUrl("1"));
-	}
 }

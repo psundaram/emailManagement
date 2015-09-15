@@ -41,7 +41,7 @@ public class RelayEmailDAO {
 	 * Tag value in content and subject are replaced with appropriate value from
 	 * API call, Tag map or relay email.
 	 */
-	public String generateActualContent(Map<String, String> elementMap, Map<String, String> configMap) throws SQLException, JSONException, IOException {
+	public String[] generateActualContent(Map<String, String> elementMap, Map<String, String> configMap) throws SQLException, JSONException, IOException {
 		logger.info("Entering generateActualContent");
 		
 		String						content			= null;
@@ -159,7 +159,8 @@ public class RelayEmailDAO {
 		}
 		
 		logger.info("Exiting generateActualContent -->" + content);
-		return subject + "##" + content;
+		String[] arr = {subject,content};
+		return arr;
 	}
 
 	
