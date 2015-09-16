@@ -41,7 +41,6 @@ import com.anpi.app.dao.ReadEmailDAO;
 import com.anpi.app.domain.EmailCredits;
 import com.anpi.app.domain.TagMapDTO;
 import com.anpi.app.util.CommonUtil;
-import com.anpi.app.util.DbConnect;
 import com.anpi.app.util.URLReaderUtil;
 import com.google.common.base.Strings;
 
@@ -589,12 +588,11 @@ public class ReadEmailService {
 		
 		String						content			= null;
 		String						subject			= null;
-		String						query			= null;
 		List<String>				tagsUsedList	= null;
 		Map<String, String>			apiMap			= new HashMap<String, String>();
 		String 						isPublished 	= CommonUtil.getValueForMap(configMap, "is_published");
-		Map<String, String> 		map				= new HashMap<String, String>();
 		List<String>				dbTagList		= new ArrayList<String>();
+		Map<String,String>			dbTagMap		= new HashMap<String, String>();
 		
 		if (!configMap.isEmpty()) {
 			
@@ -628,6 +626,7 @@ public class ReadEmailService {
 			content 	= content.replaceAll("<<.SIGNATURE CONTENT>>", "");
 		}
 		
+		/* Special handling for product tags. If tagMap.source equals 2, then query product table */
 		for (String tagName : tagMap.keySet()) {
 			TagMapDTO tagMapDTO = tagMap.get(tagName);
 			if(tagMapDTO.getSource().equals("2")){
@@ -636,8 +635,7 @@ public class ReadEmailService {
 		}
 		
 		if(dbTagList!=null && !dbTagList.isEmpty()){
-			String dbTagQuery = "select netx_id,product_type from products where netx_id in ('" + dbTagList + "' ) and   partner_id ='" + configMap.get("actual_partner_id") + "'";
-			System.out.println("dbTagQuery :" + dbTagQuery);
+			dbTagMap = readEmailDAO.getProductDetails(dbTagList, configMap.get("actual_partner_id"));
 		}
 		
 		for (String tag : tagMap.keySet()) {
@@ -670,17 +668,11 @@ public class ReadEmailService {
 							}
 						}
 						
+						//TODO - To check 
 						/* CONDITION TO HANDLE DB TAGS */
-						else if (tagMap.containsKey(tagName) && tagMapDTO.getSource()==2) {
-							/* Retrieve partner product information for the actual partner Id */
-							String dbTagQuery = "select product_type from products where netx_id='" + tagName + "' and   partner_id ='" + configMap.get("actual_partner_id") + "'";
+						else if (tagMap.containsKey(tagName) && tagMapDTO.getSource()==2 && !Strings.isNullOrEmpty(CommonUtil.getValueForMap(dbTagMap, tagName))) {
 							
-							logger.info("dbTagQuery:" + dbTagQuery);
-							
-							map = new DbConnect().getConfigsFromSingleQuery(dbTagQuery);
-							if(map!=null && !map.isEmpty()){
-								replacedValue = map.get("product_type");
-							}
+								replacedValue = dbTagMap.get(tagName);
 						} 
 						
 						/* replace tags with tag value  */
@@ -743,6 +735,7 @@ public class ReadEmailService {
 	
 	}
 	
+	
 	/**
 	 * Delete the documents uploaded in temp directory.
 	 */
@@ -767,8 +760,10 @@ public class ReadEmailService {
 		logger.info("Exiting deleteFiles " );
 	}
 
-
-
+	
+	/**
+	 * Update mail_sent status to "SENT" in email_logs table
+	 */
 	public void updateLogger(int insertId) {
 		 readEmailDAO.updateLogger(insertId);
 	}

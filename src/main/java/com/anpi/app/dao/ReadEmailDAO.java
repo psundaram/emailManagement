@@ -1,6 +1,7 @@
 package com.anpi.app.dao;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
@@ -18,6 +19,9 @@ public class ReadEmailDAO {
 	@Autowired
 	DbConnect dbConnect; 
 	
+	/**
+	 * Get configuration based on setId and emailName 
+	 */
 	public Map<String, String> getConfigForSetId(String emailName, String setID)
 			throws SQLException {
 		
@@ -25,13 +29,16 @@ public class ReadEmailDAO {
 				+ "' and email_name='" + emailName + "'  AND customer_id=-1";
 		String query2 = "select cc_email,reply_to_email from email_configs_opt_vw where setId='"
 				+ setID + "' AND email_name='" + emailName + "'  AND customer_id=-1";
+		
 		String query = query1 + "###" + query2;
 		
 		return dbConnect.getConfigsFromMultipleQuery(query.split("###"));
 	}
 
 	
-	/** Get configuration for given orderId and emailName */
+	/** 
+	 * Get configuration for given orderId and emailName 
+	 */
 	public Map<String, String> getConfigForOrderId(String orderId, String emailName)
 			throws SQLException {
 		
@@ -46,7 +53,9 @@ public class ReadEmailDAO {
 	}
 
 	
-	/** Get configuration for given customerId and emailName */
+	/** 
+	 * Get configuration for given customerId and emailName 
+	 */
 	public Map<String, String> getConfigForCustomerId(String customerId, String emailName)
 			throws SQLException {
 		
@@ -61,6 +70,9 @@ public class ReadEmailDAO {
 	}
 	
 	
+	/**
+	 *  Retrieve tags list for the configId 
+	 */
 	public Map<String, TagMapDTO> getTagsList(String configId) throws SQLException {
 		
 		String query = "select tag_name, tag_value, source from email_tags where email_config_id = '" + configId + "'";
@@ -68,11 +80,25 @@ public class ReadEmailDAO {
 		return dbConnect.getTags(query);
 	}
 
+	
+	/**
+	 *  Retrieve partner product information for the actual partnerId 
+	 */
+	public Map<String,String> getProductDetails(List<String> netxIds, String partnerId) throws SQLException{
+	
+		String query = "select netx_id,product_type from products where netx_id in ('" + netxIds + "' ) and   partner_id ='" + partnerId + "'";
+		
+		return dbConnect.getConfigsFromSingleQuery(query);
+	}
 
+	
+	/**
+	 *  Insert into email_logs table
+	 */
 	public int insetIntoDb(String columns, String val) {
+		
 		String sql = "INSERT INTO email_logs (" + columns + ") VALUES (" + val + ");";
 		
-		logger.info("Exiting insert relayDAO==>" + sql);
 		return dbConnect.putLogs(sql);
 	}
 	
