@@ -1,4 +1,4 @@
-package com.anpi.app.controller;
+package com.anpi.app.init;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,6 +27,9 @@ import org.apache.log4j.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities.EscapeMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.anpi.app.constants.Constants;
@@ -42,9 +45,10 @@ public class ReadEmail {
 	
 	private static final Logger	logger						= Logger.getLogger(ReadEmail.class);
 	
-	RelayEmailDAO				relayEmailDAO				= new RelayEmailDAO();
-	
-	ReadEmailService 			readEmailService 			= new ReadEmailService();
+	@Autowired
+	RelayEmailDAO				relayEmailDAO;
+	@Autowired
+	ReadEmailService 			readEmailService;
 	
 	public Session				emailSession				= null;
 	public String				messageContentFinal			= null;
@@ -56,6 +60,18 @@ public class ReadEmail {
 	public Map<String, String>	elementsForMessage			= null;
 	public List<String>			uploadedUuids				= new ArrayList<String>();
 
+	
+	static{
+		ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
+		ReadEmail readEmail = context.getBean(ReadEmail.class);
+		
+		EmailCredits emailCredits = new EmailCredits();
+		
+		emailCredits.setUsername("relay");
+		emailCredits.setPassword(Constants.RELAY_PASSWORD);
+		emailCredits.setPopHost(Constants.RELAY_HOST);
+		readEmail.fetch(emailCredits);
+	}
 	
 	public static void main(String[] args) {
 		

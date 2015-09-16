@@ -2,7 +2,7 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.anpi.app.dao;
+package com.anpi.app.util;
 
 import java.sql.DriverManager;
 import java.sql.ResultSet;

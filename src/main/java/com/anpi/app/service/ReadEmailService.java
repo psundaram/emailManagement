@@ -31,6 +31,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.json.simple.parser.ParseException;
 import org.jsoup.Jsoup;
+import org.springframework.stereotype.Component;
 
 import com.anpi.app.constants.Constants;
 import com.anpi.app.domain.EmailCredits;
@@ -38,7 +39,7 @@ import com.anpi.app.util.CommonUtil;
 import com.anpi.app.util.URLReaderUtil;
 import com.google.common.base.Strings;
 
-
+@Component
 public class ReadEmailService {
 	
 	private static final Logger	logger			= Logger.getLogger(ReadEmailService.class);
