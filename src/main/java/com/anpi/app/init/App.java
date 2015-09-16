@@ -34,11 +34,11 @@ public class App {
 	@Scheduled(cron="0 0/5 * * * ?")
 	private void runCron(){
 		System.out.println("Date :" + new Date());
-//		EmailCredits emailCredits = new EmailCredits();
-//		emailCredits.setUsername("relay");
-//		emailCredits.setPassword(Constants.RELAY_PASSWORD);
-//		emailCredits.setPopHost(Constants.RELAY_HOST);
-//		readEmail.fetch(emailCredits);
+		EmailCredits emailCredits = new EmailCredits();
+		emailCredits.setUsername("relay");
+		emailCredits.setPassword(Constants.RELAY_PASSWORD);
+		emailCredits.setPopHost(Constants.RELAY_HOST);
+		readEmail.fetch(emailCredits);
 		System.out.println("*************************************");
 	}
 }

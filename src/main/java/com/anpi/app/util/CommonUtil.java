@@ -111,7 +111,7 @@ public class CommonUtil
 	/**
 	 * Convert to csv.
 	 */
-	public static String convertToCsv(ArrayList<String> alist)
+	public static String convertToCsv(List<String> alist)
 	{
 		String returnThis = "";
 		for (String str : alist)
