@@ -4,9 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -19,30 +16,24 @@ import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Part;
-import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
 import javax.mail.Store;
-import javax.mail.Transport;
-import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
-import javax.mail.internet.MimeMultipart;
 
 import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities.EscapeMode;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.anpi.app.constants.Constants;
 import com.anpi.app.domain.EmailCredits;
+import com.anpi.app.service.ReadEmailService;
 import com.anpi.app.service.RelayEmailDAO;
 import com.anpi.app.util.CommonUtil;
-import com.anpi.app.util.URLReaderUtil;
 import com.anpi.app.util.UploadToDocRepo;
 import com.google.common.base.Strings;
 
@@ -51,8 +42,9 @@ public class ReadEmail {
 	
 	private static final Logger	logger						= Logger.getLogger(ReadEmail.class);
 	
-	@Autowired
-	RelayEmailDAO				relayEmailDAO;
+	RelayEmailDAO				relayEmailDAO				= new RelayEmailDAO();
+	
+	ReadEmailService 			readEmailService 			= new ReadEmailService();
 	
 	public Session				emailSession				= null;
 	public String				messageContentFinal			= null;
@@ -92,7 +84,7 @@ public class ReadEmail {
 		
 		try {
 
-			properties 	 = getProperties(emailCredits);
+			properties 	 = readEmailService.getProperties(emailCredits);
 			emailSession = Session.getDefaultInstance(properties);
 			
 			/* create the POP3 store object and connect with the pop server */
@@ -149,21 +141,10 @@ public class ReadEmail {
 	}
 
 	
-	public Properties getProperties(EmailCredits emailCredits)
-	{
-		Properties properties = new Properties();
-		
-		properties.put("mail.store.protocol", "pop3");
-		properties.put("mail.pop3.host", emailCredits.getPopHost());
-		properties.put("mail.smtp.auth", "none");
-		properties.put("mail.smtp.starttls.enable", "true");
-		properties.put("mail.smtp.host", "smtp.anpi.com");
-		properties.put("mail.smtp.port", "25");
-		
-		return properties;
-	}
-	
-	
+	/** 
+	 * This method process the email based on content_type from mail server,
+	 * and logs the email into db
+	 */
 	public String processMessage(Message message)
 	{
 		String partnerId = "1";
@@ -173,14 +154,15 @@ public class ReadEmail {
 			writePart(message);
 			
 			/* Fetch configuration based on the email name */
-			getConfiguration(elementsForMessage);
+			configMap = readEmailService.getConfiguration(elementsForMessage);
 			
 			/* Compose message with all attachments */
 			messageToBeSent = createMessage(message,elementsForMessage, configMap);
 			
 			/* Upload files to doc Repository */
-			if (!Strings.isNullOrEmpty(getValueForElementsMap("partner_id")))
-				partnerId = getValueForElementsMap("partner_id");
+			if (!Strings.isNullOrEmpty(CommonUtil.getValueForMap(elementsForMessage,"partner_id"))){
+				partnerId = CommonUtil.getValueForMap(elementsForMessage,"partner_id");
+			}
 			
 			if (null != filesToBeDeleted && !filesToBeDeleted.isEmpty()) 
 				uploadFiles(filesToBeDeleted, partnerId);
@@ -191,13 +173,14 @@ public class ReadEmail {
 			 * the email log table */
 			if (!configMap.isEmpty() && !configMap.get("status").equalsIgnoreCase("inactive")
 					&& null != messageToBeSent) {
-				sendMail(messageToBeSent);
+				readEmailService.sendMail(messageToBeSent,configMap,emailSession);
 				relayEmailDAO.updateLogger(insertId);
 			}
 			
 			/* Deletes files from temp directory */
 			if (null != filesToBeDeleted && !filesToBeDeleted.isEmpty()) {
-				deleteFiles(filesToBeDeleted);
+				uploadedUuids 	 = new ArrayList<String>();
+				readEmailService.deleteFiles(filesToBeDeleted);
 			}
 			
 			return "YES";
@@ -206,7 +189,6 @@ public class ReadEmail {
 		{
 			logger.info("Exception" + e.getMessage() + "\nFull exception:" + e);
 			
-			e.printStackTrace();
 			return "no";
 		}
 		finally
@@ -236,7 +218,7 @@ public class ReadEmail {
 			if (null == p.getDisposition()
 					|| ((null != p.getDisposition()) && (!p.getDisposition().equalsIgnoreCase(
 							Part.ATTACHMENT)))) {
-				elementsForMessage = identifyElements(content);
+				elementsForMessage = readEmailService.identifyElements(content);
 			}
 			
 			downloadAttachments(p);
@@ -285,7 +267,7 @@ public class ReadEmail {
 				if (null == p.getDisposition()
 						|| ((null != p.getDisposition()) && (!p.getDisposition().equalsIgnoreCase(
 								Part.ATTACHMENT)))) {
-					elementsForMessage = identifyElements(object.toString());
+					elementsForMessage = readEmailService.identifyElements(object.toString());
 				}
 				
 				downloadAttachments(p);
@@ -307,7 +289,7 @@ public class ReadEmail {
 				if (null == p.getDisposition()
 						|| ((null != p.getDisposition()) && (!p.getDisposition().equalsIgnoreCase(
 								Part.ATTACHMENT)))) {
-					elementsForMessage = identifyElements(CommonUtil.getStringFromInputStream(is));
+					elementsForMessage = readEmailService.identifyElements(CommonUtil.getStringFromInputStream(is));
 				}
 				
 				downloadAttachments(p);
@@ -321,179 +303,23 @@ public class ReadEmail {
 
 	
 	/**
-	 *  Look for configuration based on email name and then compose message
-	 */
-	public void getConfiguration(Map<String, String> elementsForMessage)
-			throws Exception {
-		
-		logger.info("Entering createNoAttachmentMessage");
-		
-				configMap	= new HashMap<String, String>();
-		String	setId		= getValueForElementsMap("SetID");												;
-		String	partnerId	= getValueForElementsMap("PartnerID");
-		String	isLegacy	= getValueForElementsMap("isLegacy");
-		String	customerId	= getValueForElementsMap("CustomerID");
-		String	orderId		= getValueForElementsMap("OrderID");
-		String	emailName	= StringUtils.deleteWhitespace(elementsForMessage.get("EmailName"));
-		
-		/* Look for configurations based on the orderID, followed by CustomerID,
-		 * followed by the SetID and then PartnerID. If configuration is empty,
-		 * look configuration for other parameter */
-		
-//		if (!Strings.isNullOrEmpty(orderId))
-//			configMap = relayEmailDAO.getConfigForOrderId(orderId, emailName);
-		
-//		if (checkConfigIsEmpty() && !Strings.isNullOrEmpty(customerId))
-//			configMap = relayEmailDAO.getConfigForCustomerId(customerId, emailName);
-		
-		if (checkConfigIsEmpty() && !Strings.isNullOrEmpty(setId)) {
-			if (isLegacy != null && isLegacy.equalsIgnoreCase(Constants.Y))
-				setId = Constants.ANPI;
-			
-			configMap = relayEmailDAO.generateMultiQueryStringToObtainConfig(true, setId, emailName);
-		}
-		
-		else if (checkConfigIsEmpty() && !Strings.isNullOrEmpty(partnerId)) {
-			if (isLegacy != null && isLegacy.equalsIgnoreCase(Constants.Y)) {
-				setId = Constants.ANPI;
-				configMap = relayEmailDAO.generateMultiQueryStringToObtainConfig(true, setId, emailName);
-			}
-			
-			else {
-				configMap = relayEmailDAO.generateMultiQueryStringToObtainConfig(false, partnerId, emailName);
-			}
-		}
-		
-		logger.info("config-Status --> " + configMap.get("status") + ",\nconfiguration map --> " + configMap);
-		
-		/* Compose message to be sent with the configMap and relay parameters */
-		
-		logger.info("Exiting createNoAttachmentMessage");
-	}
-	
-	
-	/**
 	 * Inserts values into email_log table.
 	 */
 	public int addLogger() throws MessagingException {
 		logger.info("Entering addLogger");
 		
 		/* Generate the map for the logs to be added.*/
-		Map<String, String> 	parameterMap = createLoggerMap(elementsForMessage, configMap,newMessage);
-		int 					insertId 	 = relayEmailDAO.insert(parameterMap);
-		
-		logger.info("Exiting addLogger --> " + insertId);
-		return insertId;
-	}
-	
-	
-	/**
-	 * Inserts values into email_log table.
-	 * Reads the values from relay and config table and insert values into
-	 * email_logs table.
-	 */
-	public Map<String, String> createLoggerMap(Map<String, String> elementsForMessage, Map<String, String> configMap, Message newMessage) throws MessagingException {
-		logger.info("Entering createLoggerMap");
-		
-		Map<String, String>		parameterMap	= new HashMap<String, String>();
-		String					signature		= null;
-		String					content			= null;
-		String					partnerId		= null;
-		int						mailSent		= 0;
-		String 					status 			= getValueForConfig("status");
-		String 					useConfig 		= getValueForElementsMap("UseConfig");
-		String 					configuration	= null;
-		String 					emailName 		= null;
-
-		logger.info("createLoggerMap configMap -->" + configMap +  "\nelementsForMessage-->" + elementsForMessage);
-		logger.info("Status -->" + status + " , UseConfig -->" + useConfig );
-		
-		/* Read values from the relaymail content (elementsForMessage map) */
-		if (configMap.isEmpty() || "inactive".equalsIgnoreCase(status) || "forward".equalsIgnoreCase(status)
-				|| ("ask".equalsIgnoreCase(status) && "no".equalsIgnoreCase(useConfig))) {
-			
-			//TODO If ask status is introduced,configuration value needs to be changed
-			
-			if (!configMap.isEmpty() && ("ask".equalsIgnoreCase(status) && "no".equalsIgnoreCase(useConfig) || ("forward"
-							.equalsIgnoreCase(status)))) {
-				mailSent 		= 1;
-				configuration 	= "FORWARD";
-			}
-			else {
-				mailSent 		= 0;
-				configuration 	= "DISABLED";
-			}
-
-			signature 	= getValueForElementsMap("Signature");
-			content 	= getValueForElementsMap("Content");
-			content	    = Jsoup.parse(content).toString();
-			content 	= content + "<br/><br/>" + signature;
-			emailName 	= getValueForElementsMap("EmailName");
-
-		} 
-		/* Read from the values fetched from the DB and putting values into
-		 table with actual configs. */
-		else {
-			
-			mailSent		= 1;
-			configuration 	= "ENABLED";
-			emailName 		= getValueForConfig("email_name_display");
-			content 		= getValueForConfig("content_template");
-			
-			if (messageContentFinal != null && StringUtils.isNotBlank(messageContentFinal)) {
-				content = messageContentFinal;
-			}
-
-			/* In case of Channel partner,insert parent partner id */
-			if (!Strings.isNullOrEmpty(getValueForConfig("actual_partner_id"))
-					&& (!Strings.isNullOrEmpty(getValueForConfig("partner_type"))) 
-					&& getValueForConfig("partner_type").equals("2")) {
-				parameterMap.put("parent_partner_id", getValueForConfig("actual_partner_id"));
-			}
-		}
-
-		if (!Strings.isNullOrEmpty(getValueForConfig("source"))) {
-			parameterMap.put("classification", getValueForConfig("source"));
-		}
-
-		/* Inserting partner_id value in db*/
-		if (!Strings.isNullOrEmpty(getValueForConfig("partner_id"))) {
-			partnerId = getValueForConfig("partner_id");
-		}
-		else if (!Strings.isNullOrEmpty(getValueForElementsMap("PartnerID"))) {
-			partnerId = getValueForElementsMap("PartnerID");
-		}
-		else {
-		}
-		
-		String toAddress = CommonUtil.getAddressFromMessage(newMessage.getRecipients(Message.RecipientType.TO));
-		String ccAddress = CommonUtil.getAddressFromMessage(newMessage.getRecipients(Message.RecipientType.CC));
-		String subject 	 = StringEscapeUtils.escapeSql(newMessage.getSubject());
-		
-		parameterMap.put("from", CommonUtil.extractAddr(newMessage.getFrom()[0].toString()));
-		parameterMap.put("reply_to", CommonUtil.extractAddr(newMessage.getReplyTo()[0].toString()));
-		parameterMap.put("to", toAddress);
-		parameterMap.put("cc", ccAddress);
-		parameterMap.put("mail_sent", String.valueOf(mailSent));
-		parameterMap.put("sent_date", CommonUtil.convertToUTCString(new Date()));
-		parameterMap.put("setId", elementsForMessage.get("SetID"));
-		parameterMap.put("partner_id", partnerId);
-		parameterMap.put("subject", StringEscapeUtils.unescapeHtml(subject));
-		parameterMap.put("content", StringEscapeUtils.escapeSql(content));
-		parameterMap.put("customer_id", getValueForElementsMap("CustomerID"));
-		parameterMap.put("order_id", getValueForElementsMap("OrderID"));
-		parameterMap.put("sending_status", "Created");
-		parameterMap.put("resend_count", "0");
-		parameterMap.put("configuration", configuration);
-		parameterMap.put("email_name", emailName);
+		Map<String, String> 	parameterMap = readEmailService.createLoggerMap(elementsForMessage, configMap,newMessage,messageContentFinal);
 		
 		if (uploadedUuids != null && !uploadedUuids.isEmpty()) {
 			parameterMap.put("attachments", CommonUtil.convertToCsv(uploadedUuids));
 			parameterMap.put("file_names", CommonUtil.convertToCsv(fileNames));
 		}
 		
-		logger.info("Exiting createLoggerMap");
-		return parameterMap;
+		int 					insertId 	 = relayEmailDAO.insert(parameterMap);
+		
+		logger.info("Exiting addLogger --> " + insertId);
+		return insertId;
 	}
 	
 	
@@ -505,8 +331,8 @@ public class ReadEmail {
 		
 		String	content		= null;
 				newMessage	= new MimeMessage(emailSession);
-		String	status		= getValueForConfig("status");
-		String	useConfig	= getValueForElementsMap("UseConfig");
+		String	status		= CommonUtil.getValueForMap(configMap,"status");
+		String	useConfig	= CommonUtil.getValueForMap(elementsForMessage,"UseConfig");
 		
 		logger.info("Status -->" + status + " , UseConfig -->" + useConfig );
 		
@@ -515,28 +341,28 @@ public class ReadEmail {
 				|| "forward".equalsIgnoreCase(status) || ("ask".equalsIgnoreCase(status)
 				&& "no".equalsIgnoreCase(useConfig))) {
 			
-			Address[] fromAddressArr = getAddressArrFromElementsMap("From");
+			Address[] fromAddressArr = readEmailService.getAddressArrFromElementsMap("From",elementsForMessage,configMap);
 			newMessage.setFrom(fromAddressArr[0]);
 			
-			Address[] toAddressesArr = getAddressArrFromElementsMap("To");
+			Address[] toAddressesArr = readEmailService.getAddressArrFromElementsMap("To",elementsForMessage,configMap);
 			newMessage.setRecipients(Message.RecipientType.TO, toAddressesArr);
 
-			Address[] ccAddressesArr = getAddressArrFromElementsMap("CC");
+			Address[] ccAddressesArr = readEmailService.getAddressArrFromElementsMap("CC",elementsForMessage,configMap);
 			newMessage.setRecipients(Message.RecipientType.CC, ccAddressesArr);
 			
 			InternetAddress bccList[] = InternetAddress.parse(Constants.BCC_EMAIL_ADDRESS);
 			newMessage.setRecipients(Message.RecipientType.BCC, bccList);
 			
-			Address[] replyToAddressesArr = getAddressArrFromElementsMap("ReplyTo");
+			Address[] replyToAddressesArr = readEmailService.getAddressArrFromElementsMap("ReplyTo",elementsForMessage,configMap);
 			newMessage.setReplyTo(replyToAddressesArr);
 				
-			newMessage.setSubject(StringEscapeUtils.unescapeHtml(getValueForElementsMap("Subject")));
+			newMessage.setSubject(StringEscapeUtils.unescapeHtml(CommonUtil.getValueForMap(elementsForMessage,"Subject")));
 			
-			String signature = getValueForElementsMap("Signature");
+			String signature = CommonUtil.getValueForMap(elementsForMessage,"Signature");
 			if(!Strings.isNullOrEmpty(signature)){
-				content = getValueForElementsMap("Content") + "<br/><br/>" + signature;
+				content = CommonUtil.getValueForMap(elementsForMessage,"Content") + "<br/><br/>" + signature;
 			}else{
-				content = getValueForElementsMap("Content") + "<br/><br/>";
+				content = CommonUtil.getValueForMap(elementsForMessage,"Content") + "<br/><br/>";
 			}
 			
 			content = StringEscapeUtils.unescapeHtml(content);
@@ -545,31 +371,31 @@ public class ReadEmail {
 		/* Read values from the DB and create the new message */
 		else {
 			
-			String fromEmailValue = getValueForConfig("from_email");
+			String fromEmailValue = CommonUtil.getValueForMap(configMap,"from_email");
 			String fromAddress ;
 			
 			if (!Strings.isNullOrEmpty(fromEmailValue) && !"generated".equals(fromEmailValue)) 
 				fromAddress = configMap.get("from_email");
 			 else
-				fromAddress = getValueForElementsMap("From");
+				fromAddress = CommonUtil.getValueForMap(elementsForMessage,"From");
 			
 			newMessage.setFrom(new InternetAddress(fromAddress.toString(), fromAddress.split("@")[0].toString().toUpperCase()));
 			newMessage.setRecipients(Message.RecipientType.TO,
-					getAddressForActiveStatus("to_email", "To"));
+					readEmailService.getAddressForActiveStatus("to_email", "To",elementsForMessage,configMap));
 			newMessage.setRecipients(Message.RecipientType.CC,
-					getAddressForActiveStatus("cc_email", "CC"));
-			newMessage.setReplyTo(getAddressForActiveStatus("reply_to_email", "ReplyTo"));
+					readEmailService.getAddressForActiveStatus("cc_email", "CC",elementsForMessage,configMap));
+			newMessage.setReplyTo(readEmailService.getAddressForActiveStatus("reply_to_email", "ReplyTo",elementsForMessage,configMap));
 			newMessage.setRecipients(Message.RecipientType.BCC,
 					InternetAddress.parse(Constants.BCC_EMAIL_ADDRESS));
 			
 			String[] generatedString = relayEmailDAO.generateActualContent(elementsForMessage, configMap);
 			
-			if (!Strings.isNullOrEmpty(getValueForConfig("subject"))) {
+			if (!Strings.isNullOrEmpty(CommonUtil.getValueForMap(configMap,"subject"))) {
 				String subject = generatedString[0];
 				newMessage.setSubject(StringEscapeUtils.unescapeHtml(subject));
 			}
 			else {
-				newMessage.setSubject(StringEscapeUtils.unescapeHtml(getValueForElementsMap("Subject")));
+				newMessage.setSubject(StringEscapeUtils.unescapeHtml(CommonUtil.getValueForMap(elementsForMessage,"Subject")));
 			}
 			
 			content = generatedString[1];
@@ -591,106 +417,12 @@ public class ReadEmail {
 		newMessage.saveChanges();
 		
 		/** Add attachments if exist */
-		Message messageSent = createMessageWithAllAttachments(message, newMessage);
+		Message messageSent = readEmailService.createMessageWithAllAttachments(message, newMessage,emailSession,filesToBeDeleted);
 		
 		return messageSent;
 	}
 	
 	
-	
-	/**
-	 * Create message part and add attachments if exists
-	 */
-	public Message createMessageWithAllAttachments(Part part, Message messageWithoutAttachment)
-			throws MessagingException, IOException {
-		logger.info("Entering createMessageWithAllAttachments");
-		
-		Message			msgWithAttachments	= null;
-		Multipart		multipart					= new MimeMultipart();
-		MimeBodyPart	messageBodyPart				= new MimeBodyPart();
-		MimeBodyPart	attachPart					= null;
-		
-		if (part.getContentType().contains("multipart")) {
-			
-			msgWithAttachments = new MimeMessage(emailSession);
-			
-			msgWithAttachments.setFrom(messageWithoutAttachment.getFrom()[0]);
-			msgWithAttachments.setRecipients(Message.RecipientType.TO,
-					messageWithoutAttachment.getRecipients(Message.RecipientType.TO));
-			msgWithAttachments.setRecipients(Message.RecipientType.CC,
-					messageWithoutAttachment.getRecipients(Message.RecipientType.CC));
-			msgWithAttachments.setRecipients(Message.RecipientType.BCC,
-					messageWithoutAttachment.getRecipients(Message.RecipientType.BCC));
-			msgWithAttachments.setReplyTo(messageWithoutAttachment.getReplyTo());
-			msgWithAttachments.setSubject(messageWithoutAttachment.getSubject());
-			
-			if (filesToBeDeleted == null || filesToBeDeleted.isEmpty()) {
-				msgWithAttachments.setContent(messageWithoutAttachment.getContent(),
-						"text/html");
-			}
-			else {
-				/* Attaching attachments here */
-				messageBodyPart.setContent(messageWithoutAttachment.getContent(), "text/html");
-				multipart.addBodyPart(messageBodyPart);
-				
-				for (String filename : filesToBeDeleted) {
-					
-					logger.info("Attaching would appear based on the number of attachments");
-					
-					attachPart = new MimeBodyPart();
-					attachPart.attachFile(filename);
-					multipart.addBodyPart(attachPart);
-				}
-				
-				msgWithAttachments.setContent(multipart);
-			}
-		}
-		
-		else {
-			logger.info("No attachments at all");
-			
-			msgWithAttachments = messageWithoutAttachment;
-		}
-		
-		logger.info("Exiting createMessageWithAllAttachments");
-		return msgWithAttachments;
-	}
-	
-
-
-	/**
-	 * Reads email content from mail server
-	 */
-	public Map<String, String> identifyElements(String content) {
-		logger.info("Entering identifyElements contents");
-		
-		HashMap<String, String>	elementsForMessage	= new HashMap<String, String>();
-		String					usefulContent		= content.split(Constants.SPLITMULTIHASH)[1].trim();
-		String[]				lines				= usefulContent.split(Constants.SPLITHASH);
-		
-		for (String line : lines) {
-			
-			if (null != line && !("null".equalsIgnoreCase(line))) {
-				
-							line	= line.replace("\n", "").replace("\r", "");
-				String[]	lineArr	= line.split(":", 2);
-				String		key		= lineArr[0];
-				String		value	= "";
-				
-				if (lineArr.length == 2) 
-					value = lineArr[1];
-				
-				elementsForMessage.put(key.trim(), value.trim());
-			}
-			else {
-			}
-		}
-		
-		logger.info("Exiting identifyElements contents ");
-		return elementsForMessage;
-	}
-
-		
 	/**
 	 * If message contains attachments, save it to temp directory
 	 */
@@ -737,240 +469,5 @@ public class ReadEmail {
 		logger.info("Exiting uploadFiles");
 	}
 	
-	
-	/**
-	 * Send mail based on SMTP server configuration of partner
-	 */
-	public void sendMail(Message message) throws Exception {
-		
-		Transport	transport	= null;
-		String		partnerId	= getValueForConfig("partner_id");
-		String		smtpServer	= getValueForConfig("smtp_server");
-		String		userName	= getValueForConfig("user_name");
-		String		password	= getValueForConfig("password");
-		String		port		= getValueForConfig("port");
-		
-		logger.info("Send mail Partner Id:"  + partnerId);
-		
-		/* Use partner SMTP server setting for sending mail,if configured. */
-		if ("1".equals(getValueForConfig("smtp_applicable")) && !Strings.isNullOrEmpty(smtpServer)
-				&& !Strings.isNullOrEmpty(port) && !Strings.isNullOrEmpty(userName)
-				&& !Strings.isNullOrEmpty(password)) {
-			
-			Properties props = new Properties();
-			props.put("mail.smtp.auth", "true");
-			props.put("mail.smtp.host", smtpServer.trim());
-			props.put("mail.smtp.port", port);
-			
-			try {
-				Session session = Session.getInstance(props, new javax.mail.Authenticator() {
-					protected PasswordAuthentication getPasswordAuthentication() {
-						return new PasswordAuthentication(getValueForConfig("user_name"),
-								getValueForConfig("password").trim());
-					}
-				});
-				
-				session.setDebug(true);
-				transport = session.getTransport("smtp");
-				transport.connect();
-			}
-			catch (Exception e) {
-				e.printStackTrace();
-				System.out.println("Exception -->" + e.getMessage());
-			}
-			
-			/* If SMTP authentication fails, send mail through default
-			 * SMTP configuration and trigger a mail to account manager */
-			if (!transport.isConnected()) {
-				transport = emailSession.getTransport("smtp");
-				transport.connect();
-				Message failureMessage = mailFailure(configMap.get("account_manager"));
-				transport.sendMessage(failureMessage, failureMessage.getAllRecipients());
-			}
-		}
-		
-		else {
-			transport = emailSession.getTransport("smtp");
-			transport.connect();
-		}
-		
-		transport.sendMessage(message, message.getAllRecipients());
-		transport.close();
-	}
-	
-	
-	/**
-	 *  If SMTP authentication fails, send mail to account manager
-	 */
-	public Message mailFailure(String accountManager) throws Exception
-	{
-		Map<String, String> userMap = new HashMap<String, String>();
-							userMap = URLReaderUtil.getInputFromUrl(Constants.PARTNER_SMTP_DETAILS + "users/" + accountManager);
-							
-		Message statusMessage = new MimeMessage(emailSession);
-		statusMessage.setFrom(new InternetAddress("donotreply@anpi.com"));
-		statusMessage.setRecipient(Message.RecipientType.TO,new InternetAddress(userMap.get("email_id")));
-		
-		if (messageToBeSent.getContent() instanceof Multipart) {
-			statusMessage.setContent((Multipart) messageToBeSent.getContent());
-		}
-		
-		else {
-			statusMessage.setContent(messageToBeSent.getContent(), "text/html");
-		}
-		
-		statusMessage.setSubject("Mail delivery failure - SMTP server auth error");
-		return statusMessage;
-	}
-	
-	
-	/**
-	 * Delete the documents uploaded in temp directory.
-	 */
-	public void deleteFiles(List<String> paths) {
-		logger.info("Entering deleteFiles");
-		
-		File 		file = null;
-		uploadedUuids = new ArrayList<String>();
-		
-		for (String path : paths) {
-			
-			file = new File(path);
-			
-			boolean isdeleted = file.delete();
-			if (isdeleted) {
-				logger.info("The generated attachment is deleted.");
-			}
-			else {
-				logger.info("The generated attachment failed to get deleted.");
-			}
-		}
-		
-		logger.info("Exiting deleteFiles " );
-	}
-	
-	
-	/**
-	 * Get value corresponding to key from elementsForMessage(Relay email) map 
-	 */
-	public String getValueForElementsMap(String key) {
-		System.out.println("Key:"+ key);
-		String value = "";
-		if (elementsForMessage.containsKey(key)
-				&& !Strings.isNullOrEmpty(elementsForMessage.get(key))) {
-			System.out.println(elementsForMessage.get(key));
-			value =  elementsForMessage.get(key);
-		}
-		
-		return value;
-	}
-	
-	
-	/**
-	 * Get value corresponding to key from config(database config) map 
-	 */
-	public String getValueForConfig(String key) {
-		
-		if (configMap.containsKey(key) && !Strings.isNullOrEmpty(configMap.get(key))) {
-			return configMap.get(key);
-		}
-		
-		return "";
-	}
-	
-	
-	/**
-	 * Get addressArr for composing message(Status - FORWARD/INACTIVE)
-	 */
-	private Address[] getAddressArrFromElementsMap(String key) throws Exception {
-		
-		String 		value 			= getValueForElementsMap(key);
-		Address[] 	addressesArr	= null;
-		
-		if (!Strings.isNullOrEmpty(value)) {
-			String[] addressArr = CommonUtil.extractAddr(value).split(";");
-			
-			if ("To".equals(key) && !configMap.isEmpty()
-					&& configMap.get("status").equalsIgnoreCase("forward")
-					&& addressArr.length == 0) {
-				addressArr = Constants.NOTIFICATION_EMAIL_ADDRESS.split(";");
-			}
-			
-			if (addressArr != null) {
-				addressesArr = new Address[addressArr.length];
-				for (int i = 0; i < addressArr.length; i++) {
-					if ("From".equals(key) || "To".equals(key)) {
-						String address = addressArr[i].split("@")[0].toString().toUpperCase();
-						addressesArr[i] = new InternetAddress(addressArr[i], address);
-					}
-					else {
-						addressesArr[i] = new InternetAddress(addressArr[i]);
-					}
-				}
-			}
-		}
-		
-		return addressesArr;
-	}
-	
-	
-	/**
-	 * Get addressArr for composing message(Status - ACTIVE)
-	 */
-	private Address[] getAddressForActiveStatus(String configKey, String elementKey) throws AddressException {
-		
-		String[]	addressArr	= null; 
-		String[]	emailArr	= null;
-		String		value		= getValueForConfig(configKey);
-		
-		if (!Strings.isNullOrEmpty(value) && (!value.contains("generated"))) {
-			addressArr = value.split(",");
-		}
-		else if (!Strings.isNullOrEmpty(value) && (value.contains("generated"))) {
-			
-			String[]	confArr			= value.split(",");
-			String		emailAddress	= getValueForElementsMap(elementKey);
-			
-			if (!Strings.isNullOrEmpty(emailAddress)) {
-				emailArr = CommonUtil.extractAddr(emailAddress).split(";");
-			}
-			else if("To".equals(elementKey)){
-					emailArr = Constants.NOTIFICATION_EMAIL_ADDRESS.split(";");
-			}
-			
-			List<String> list = new ArrayList<String>(Arrays.asList(emailArr));
-			list.addAll(Arrays.asList(confArr));
-			
-			while (list.remove("generated")) {
-				// do nothing
-			}
-			
-			Object[] obj = list.toArray();
-			addressArr = Arrays.copyOf(obj, obj.length, String[].class);
-		}
-		
-		if (addressArr != null) {
-			Address[] addressesArr = new Address[addressArr.length];
-			for (int i = 0; i < addressArr.length; i++) {
-				addressesArr[i] = new InternetAddress(addressArr[i]);
-			}
-			return addressesArr;
-		}
-		
-		return null;
-	}
-	
-	
-	/** 
-	 * Check If Config map is empty 
-	 */
-	public boolean checkConfigIsEmpty() {
-		
-		boolean isEmpty = false;
-		if (configMap == null || configMap.isEmpty())
-			isEmpty = true;
-		
-		return isEmpty;
-	}
 	
 }

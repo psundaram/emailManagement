@@ -49,7 +49,7 @@ public class RelayEmailDAO {
 		String						query			= null;
 		List<String>				tagsUsedList	= null;
 		Map<String, String>			apiMap			= new HashMap<String, String>();
-		String 						isPublished 	= getValueForMap(configMap, "is_published");
+		String 						isPublished 	= CommonUtil.getValueForMap(configMap, "is_published");
 		Map<String, String> 		map				= new HashMap<String, String>();
 		List<String>				dbTagList		= new ArrayList<String>();
 		
@@ -67,17 +67,17 @@ public class RelayEmailDAO {
 
 		/* If partner is published, get branding parameters  */
 		if(!Strings.isNullOrEmpty(isPublished) && "1".equals(isPublished)){
-			String 	partnerId	= getValueForMap(configMap, "partner_id");
+			String 	partnerId	= CommonUtil.getValueForMap(configMap, "partner_id");
 					apiMap 		= URLReaderUtil.getInputFromUrl(Constants.API_CALL_URL+"partner_id="+partnerId);
 		}
 		
-		String tagsUsed = getValueForMap(elementMap,"TAGS USED");
+		String tagsUsed = CommonUtil.getValueForMap(elementMap,"TAGS USED");
 		if (!Strings.isNullOrEmpty(tagsUsed)) {
 			tagsUsedList = new ArrayList<String>(Arrays.asList(tagsUsed.split(",")));
 		}
 		
 		/* Replace signature */
-		String signature = getValueForMap(configMap, "signature");
+		String signature = CommonUtil.getValueForMap(configMap, "signature");
 		if (!Strings.isNullOrEmpty(signature) && (!signature.contains("generated"))) {
 			signature	= StringEscapeUtils.unescapeHtml(signature);
 			signature 	= replaceDollarSign(signature);
@@ -118,7 +118,7 @@ public class RelayEmailDAO {
 						}
 						
 						/* Replace tags with partner branding configuration */
-						if (!Strings.isNullOrEmpty(getValueForMap(apiMap, tagName))) {
+						if (!Strings.isNullOrEmpty(CommonUtil.getValueForMap(apiMap, tagName))) {
 							
 							if (tagName.contains("PHONE")) {
 								String 	phoneNumber 	= CommonUtil.formatNumber(apiMap.get(tagName),Constants.COMMA);
@@ -149,7 +149,7 @@ public class RelayEmailDAO {
 						} 
 						
 						/* replace tags with elements map (relay email) */
-						else if (!Strings.isNullOrEmpty(getValueForMap(elementMap, tagName))) {
+						else if (!Strings.isNullOrEmpty(CommonUtil.getValueForMap(elementMap, tagName))) {
 							
 							String 	temp 			= StringEscapeUtils.unescapeHtml(elementMap.get(tagName));
 									temp 			= replaceDollarSign(temp);
@@ -216,13 +216,13 @@ public class RelayEmailDAO {
 			configMap = getConfig(partnerMap, emailName, setId);
 			if (configMap != null && !configMap.isEmpty()) {
 				/* Setting partner smtp information */
-				configMap.put("smtp_applicable", getValueForMap(partnerMap, "smtp_applicable"));
-				configMap.put("smtp_server", getValueForMap(partnerMap, "smtp_server"));
-				configMap.put("user_name", getValueForMap(partnerMap, "user_name"));
-				configMap.put("password", getValueForMap(partnerMap, "password"));
-				configMap.put("port", getValueForMap(partnerMap, "port"));
-				configMap.put("account_manager", getValueForMap(partnerMap, "account_manager"));
-				configMap.put("is_published", getValueForMap(partnerMap, "is_published"));
+				configMap.put("smtp_applicable", CommonUtil.getValueForMap(partnerMap, "smtp_applicable"));
+				configMap.put("smtp_server", CommonUtil.getValueForMap(partnerMap, "smtp_server"));
+				configMap.put("user_name", CommonUtil.getValueForMap(partnerMap, "user_name"));
+				configMap.put("password", CommonUtil.getValueForMap(partnerMap, "password"));
+				configMap.put("port", CommonUtil.getValueForMap(partnerMap, "port"));
+				configMap.put("account_manager", CommonUtil.getValueForMap(partnerMap, "account_manager"));
+				configMap.put("is_published", CommonUtil.getValueForMap(partnerMap, "is_published"));
 			}
 		}
 		
@@ -239,9 +239,9 @@ public class RelayEmailDAO {
 		Map<String, String>		configMap	= new HashMap<String, String>();
 		String 					partnerId  	= null;
 		String 					setID 		= null;			
-		String					partnerType = getValueForMap(partnerMap, "partner_type");
-		String					parentId 	= getValueForMap(partnerMap, "parent_partner_id");
-		String 					isPublished = getValueForMap(partnerMap, "is_published");
+		String					partnerType = CommonUtil.getValueForMap(partnerMap, "partner_type");
+		String					parentId 	= CommonUtil.getValueForMap(partnerMap, "parent_partner_id");
+		String 					isPublished = CommonUtil.getValueForMap(partnerMap, "is_published");
 		
 		/* If channel partner, apply configuration of parent partner */
 		if (!Strings.isNullOrEmpty(partnerType) && "2".equals(partnerType)	&& !Strings.isNullOrEmpty(parentId)) {
@@ -249,7 +249,7 @@ public class RelayEmailDAO {
 			
 			partnerId	 	= parentId;
 			partnerMap 		= URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+ "partners?id=" + partnerId);
-			setID 			= getValueForMap(partnerMap, "partner_id");
+			setID 			= CommonUtil.getValueForMap(partnerMap, "partner_id");
 			
 			// If partner is non-published, generic config SetID = "*****"
 			if ((Strings.isNullOrEmpty(isPublished) || "0".equals(isPublished))) {
@@ -265,7 +265,7 @@ public class RelayEmailDAO {
 		
 		else {
 			setID 		= partnerMap.get("partner_id");
-			partnerId 	= getValueForMap(partnerMap, "id");
+			partnerId 	= CommonUtil.getValueForMap(partnerMap, "id");
 		}
 		
 		logger.info("SetID:" + setID + "partnerId:" + partnerId);
@@ -396,16 +396,6 @@ public class RelayEmailDAO {
 		return result;
 	}
 	
-	
-	/** Get value corresponding to key for map */
-	public String getValueForMap(Map<String, String> map,String key) {
-		
-		String	value	= "";
-		
-		if (map.containsKey(key) && !Strings.isNullOrEmpty(map.get(key))) {
-			value =  map.get(key);
-		}
-		
-		return value;
-	}
 }
+	
+	

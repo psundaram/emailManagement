@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,11 +20,36 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.springframework.util.StringUtils;
 
+import com.google.common.base.Strings;
+
 public class CommonUtil
 {
 
 	private static final Logger	logger	= Logger.getLogger(CommonUtil.class);
+	
+	/** Get value corresponding to key for map */
+	public static String getValueForMap(Map<String, String> map,String key) {
+		
+		String	value	= "";
+		
+		if (map.containsKey(key) && !Strings.isNullOrEmpty(map.get(key))) {
+			value =  map.get(key);
+		}
+		
+		return value;
+	}
 
+	/** 
+	 * Check If map is empty 
+	 */
+	public static boolean checkConfigIsEmpty(Map<String,String> map) {
+		
+		boolean isEmpty = false;
+		if (map == null || map.isEmpty())
+			isEmpty = true;
+		
+		return isEmpty;
+	}
 	
 	/**
 	 * Convert Date to utc string.
