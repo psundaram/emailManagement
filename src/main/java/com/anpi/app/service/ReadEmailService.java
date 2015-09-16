@@ -2,6 +2,8 @@ package com.anpi.app.service;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -27,6 +29,7 @@ import javax.mail.internet.MimeMultipart;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
+import org.json.simple.parser.ParseException;
 import org.jsoup.Jsoup;
 
 import com.anpi.app.constants.Constants;
@@ -87,17 +90,17 @@ public class ReadEmailService {
 			if (isLegacy != null && isLegacy.equalsIgnoreCase(Constants.Y))
 				setId = Constants.ANPI;
 			
-			configMap = relayEmailDAO.generateMultiQueryStringToObtainConfig(true, setId, emailName);
+			configMap = generateMultiQueryStringToObtainConfig(true, setId, emailName);
 		}
 		
 		else if (CommonUtil.checkConfigIsEmpty(configMap) && !Strings.isNullOrEmpty(partnerId)) {
 			if (isLegacy != null && isLegacy.equalsIgnoreCase(Constants.Y)) {
 				setId = Constants.ANPI;
-				configMap = relayEmailDAO.generateMultiQueryStringToObtainConfig(true, setId, emailName);
+				configMap = generateMultiQueryStringToObtainConfig(true, setId, emailName);
 			}
 			
 			else {
-				configMap = relayEmailDAO.generateMultiQueryStringToObtainConfig(false, partnerId, emailName);
+				configMap = generateMultiQueryStringToObtainConfig(false, partnerId, emailName);
 			}
 		}
 		
@@ -476,6 +479,48 @@ public class ReadEmailService {
 	
 	
 	/**
+	 * Query email_configs_vw based on email_name and setId or partnerId.
+	 */
+	public Map<String, String> generateMultiQueryStringToObtainConfig(boolean isSetID,
+			String setId, String emailName) throws MalformedURLException, IOException,
+			ParseException, SQLException {
+		logger.info("Entering generateMultiQueryStringToObtainConfig --> SetId,emailName " + setId + " , " + emailName);
+		
+		Map<String, String>	configMap	= new HashMap<String, String>();
+		Map<String, String>	partnerMap	= new HashMap<String, String>();
+
+		
+		/* Retrieve partner information from partner API (published status,
+		 * parent_partner_id,etc..)*/
+		if (isSetID) {
+			partnerMap = URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+ "partners?partner_id=" + setId);
+		}
+		else {
+			partnerMap = URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+ "partners?id=" + setId);
+		}
+		
+		if (partnerMap != null && !partnerMap.isEmpty()) {
+			
+			configMap = relayEmailDAO.getConfig(partnerMap, emailName, setId);
+			
+			if (configMap != null && !configMap.isEmpty()) {
+				/* Setting partner smtp information */
+				configMap.put("smtp_applicable", CommonUtil.getValueForMap(partnerMap, "smtp_applicable"));
+				configMap.put("smtp_server", CommonUtil.getValueForMap(partnerMap, "smtp_server"));
+				configMap.put("user_name", CommonUtil.getValueForMap(partnerMap, "user_name"));
+				configMap.put("password", CommonUtil.getValueForMap(partnerMap, "password"));
+				configMap.put("port", CommonUtil.getValueForMap(partnerMap, "port"));
+				configMap.put("account_manager", CommonUtil.getValueForMap(partnerMap, "account_manager"));
+				configMap.put("is_published", CommonUtil.getValueForMap(partnerMap, "is_published"));
+			}
+		}
+		
+		logger.info("Exiting generateMultiQueryStringToObtainConfig" + configMap);
+		return configMap;
+	}
+	
+	
+	/**
 	 * Delete the documents uploaded in temp directory.
 	 */
 	public void deleteFiles(List<String> paths) {
@@ -498,5 +543,7 @@ public class ReadEmailService {
 		
 		logger.info("Exiting deleteFiles " );
 	}
+	
+	
 
 }
