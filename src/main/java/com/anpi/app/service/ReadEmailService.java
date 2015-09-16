@@ -26,16 +26,22 @@ import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
 
+import net.sf.json.JSONException;
+
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.json.simple.parser.ParseException;
 import org.jsoup.Jsoup;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.anpi.app.constants.Constants;
+import com.anpi.app.dao.ReadEmailDAO;
 import com.anpi.app.domain.EmailCredits;
+import com.anpi.app.domain.TagMapDTO;
 import com.anpi.app.util.CommonUtil;
+import com.anpi.app.util.DbConnect;
 import com.anpi.app.util.URLReaderUtil;
 import com.google.common.base.Strings;
 
@@ -44,9 +50,10 @@ public class ReadEmailService {
 	
 	private static final Logger	logger			= Logger.getLogger(ReadEmailService.class);
 	
-	RelayEmailDAO				relayEmailDAO	= new RelayEmailDAO();
+	@Autowired
+	ReadEmailDAO readEmailDAO;
 	
-	
+	/** Set properies based on emailCredit object */
 	public Properties getProperties(EmailCredits emailCredits)
 	{
 		Properties properties = new Properties();
@@ -61,6 +68,7 @@ public class ReadEmailService {
 		return properties;
 	}
 	
+	
 	/**
 	 *  Look for configuration based on email name and then compose message
 	 */
@@ -69,13 +77,14 @@ public class ReadEmailService {
 		
 		logger.info("Entering createNoAttachmentMessage");
 		
-		Map<String,String>		configMap	= new HashMap<String, String>();
-		String	setId		= CommonUtil.getValueForMap(elementsForMessage,"SetID");												;
-		String	partnerId	= CommonUtil.getValueForMap(elementsForMessage,"PartnerID");
-		String	isLegacy	= CommonUtil.getValueForMap(elementsForMessage,"isLegacy");
-		String	customerId	= CommonUtil.getValueForMap(elementsForMessage,"CustomerID");
-		String	orderId		= CommonUtil.getValueForMap(elementsForMessage,"OrderID");
-		String	emailName	= StringUtils.deleteWhitespace(CommonUtil.getValueForMap(elementsForMessage,"EmailName"));
+		Map<String, String>	configMap	= new HashMap<String, String>();
+		String				setId		= CommonUtil.getValueForMap(elementsForMessage, "SetID");		;
+		String				partnerId	= CommonUtil.getValueForMap(elementsForMessage, "PartnerID");
+		String				isLegacy	= CommonUtil.getValueForMap(elementsForMessage, "isLegacy");
+		String				customerId	= CommonUtil.getValueForMap(elementsForMessage, "CustomerID");
+		String				orderId		= CommonUtil.getValueForMap(elementsForMessage, "OrderID");
+		String				emailName	= StringUtils.deleteWhitespace(CommonUtil.getValueForMap(
+												elementsForMessage, "EmailName"));
 		
 		/* Look for configurations based on the orderID, followed by CustomerID,
 		 * followed by the SetID and then PartnerID. If configuration is empty,
@@ -113,6 +122,7 @@ public class ReadEmailService {
 		
 		return configMap;
 	}
+	
 	
 	/**
 	 * Reads email content from mail server
@@ -502,7 +512,7 @@ public class ReadEmailService {
 		
 		if (partnerMap != null && !partnerMap.isEmpty()) {
 			
-			configMap = relayEmailDAO.getConfig(partnerMap, emailName, setId);
+			configMap = getConfig(partnerMap, emailName, setId);
 			
 			if (configMap != null && !configMap.isEmpty()) {
 				/* Setting partner smtp information */
@@ -520,6 +530,218 @@ public class ReadEmailService {
 		return configMap;
 	}
 	
+	/**
+	 * Get configuration for given emailname and setId
+	 */
+	public Map<String, String> getConfig(Map<String, String> partnerMap,String emailName,String setId) throws MalformedURLException, IOException, ParseException, SQLException  {
+		
+		Map<String, String>		configMap	= new HashMap<String, String>();
+		String 					partnerId  	= null;
+		String 					setID 		= null;			
+		String					partnerType = CommonUtil.getValueForMap(partnerMap, "partner_type");
+		String					parentId 	= CommonUtil.getValueForMap(partnerMap, "parent_partner_id");
+		String 					isPublished = CommonUtil.getValueForMap(partnerMap, "is_published");
+		
+		/* If channel partner, apply configuration of parent partner */
+		if (!Strings.isNullOrEmpty(partnerType) && "2".equals(partnerType)	&& !Strings.isNullOrEmpty(parentId)) {
+			logger.info("Inside channel Partner");
+			
+			partnerId	 	= parentId;
+			partnerMap 		= URLReaderUtil.getJsonFromUrl(Constants.PARTNER_SMTP_DETAILS+ "partners?id=" + partnerId);
+			setID 			= CommonUtil.getValueForMap(partnerMap, "partner_id");
+			
+			// If partner is non-published, generic config SetID = "*****"
+			if ((Strings.isNullOrEmpty(isPublished) || "0".equals(isPublished))) {
+				setID = Constants.DUMMY_PARTNER_ID;
+			}
+		}
+		
+		/* If WS partner is non-published, generic config for setId as "*****" */
+		else if ((Strings.isNullOrEmpty(isPublished) || "0".equals(isPublished))) {
+			setID 		= Constants.DUMMY_PARTNER_ID;
+			partnerId 	= partnerMap.get("id").toString();
+		}
+		
+		else {
+			setID 		= partnerMap.get("partner_id");
+			partnerId 	= CommonUtil.getValueForMap(partnerMap, "id");
+		}
+		
+		logger.info("SetID:" + setID + "partnerId:" + partnerId);
+		
+				configMap	= readEmailDAO.getConfigForSetId(emailName,setId);
+		
+		if(configMap!=null && !configMap.isEmpty()){
+			configMap.put("actual_partner_id",partnerId);
+			configMap.put("partner_type", partnerType);
+		}
+		
+		return configMap;
+	}
+	
+	
+	/**
+	 * Tag value in content and subject are replaced with appropriate value from
+	 * API call, Tag map or relay email.
+	 */
+	public String[] generateActualContent(Map<String, String> elementMap, Map<String, String> configMap) throws SQLException, JSONException, IOException {
+		logger.info("Entering generateActualContent");
+		
+		String						content			= null;
+		String						subject			= null;
+		String						query			= null;
+		List<String>				tagsUsedList	= null;
+		Map<String, String>			apiMap			= new HashMap<String, String>();
+		String 						isPublished 	= CommonUtil.getValueForMap(configMap, "is_published");
+		Map<String, String> 		map				= new HashMap<String, String>();
+		List<String>				dbTagList		= new ArrayList<String>();
+		
+		if (!configMap.isEmpty()) {
+			
+			subject = StringEscapeUtils.unescapeHtml(configMap.get("subject"));
+			content = StringEscapeUtils.unescapeHtml(configMap.get("content_template"));
+		}
+		
+		
+		Map<String, TagMapDTO> tagMap = readEmailDAO.getTagsList(configMap.get("id"));
+				
+		logger.info("tagMap -> " + tagMap);
+
+		/* If partner is published, get branding parameters  */
+		if(!Strings.isNullOrEmpty(isPublished) && "1".equals(isPublished)){
+			String 	partnerId	= CommonUtil.getValueForMap(configMap, "partner_id");
+					apiMap 		= URLReaderUtil.getInputFromUrl(Constants.API_CALL_URL+"partner_id="+partnerId);
+		}
+		
+		String tagsUsed = CommonUtil.getValueForMap(elementMap,"TAGS USED");
+		if (!Strings.isNullOrEmpty(tagsUsed)) {
+			tagsUsedList = new ArrayList<String>(Arrays.asList(tagsUsed.split(",")));
+		}
+		
+		/* Replace signature */
+		String signature = CommonUtil.getValueForMap(configMap, "signature");
+		if (!Strings.isNullOrEmpty(signature) && (!signature.contains("generated"))) {
+			signature	= StringEscapeUtils.unescapeHtml(signature);
+			signature 	= CommonUtil.replaceDollarSign(signature);
+			content 	= content.replaceAll("<<.SIGNATURE CONTENT>>", signature);
+		} else {
+			content 	= content.replaceAll("<<.SIGNATURE CONTENT>>", "");
+		}
+		
+		for (String tagName : tagMap.keySet()) {
+			TagMapDTO tagMapDTO = tagMap.get(tagName);
+			if(tagMapDTO.getSource().equals("2")){
+				dbTagList.add(tagMapDTO.getTagValue());
+			}
+		}
+		
+		if(dbTagList!=null && !dbTagList.isEmpty()){
+			String dbTagQuery = "select netx_id,product_type from products where netx_id in ('" + dbTagList + "' ) and   partner_id ='" + configMap.get("actual_partner_id") + "'";
+			System.out.println("dbTagQuery :" + dbTagQuery);
+		}
+		
+		for (String tag : tagMap.keySet()) {
+			do {
+				for (String tagName : tagMap.keySet()) {
+					
+					if (content.contains("<<." + tagName + ">>") || subject.contains("<<." + tagName + ">>")) {
+						String 		replacedValue 	= "";
+						TagMapDTO 	tagMapDTO 		= tagMap.get(tagName);
+						
+						logger.info("tagName:" + tagName);
+						
+						/* Tags used condition */
+						if (tagsUsedList != null && !tagsUsedList.isEmpty()) {
+							if (!tagsUsedList.contains(tagName)) {
+								content = content.replaceAll("<<." + tagName + ">>", "");
+								subject = subject.replaceAll("<<." + tagName + ">>", "");
+								logger.info(tagName + "tagName not found");
+							}
+						}
+						
+						/* Replace tags with partner branding configuration */
+						if (!Strings.isNullOrEmpty(CommonUtil.getValueForMap(apiMap, tagName))) {
+							
+							if (tagName.contains("PHONE")) {
+								String 	phoneNumber 	= CommonUtil.formatNumber(apiMap.get(tagName),Constants.COMMA);
+										replacedValue	= phoneNumber;
+							} else {
+										replacedValue 	= apiMap.get(tagName);
+							}
+						}
+						
+						/* CONDITION TO HANDLE DB TAGS */
+						else if (tagMap.containsKey(tagName) && tagMapDTO.getSource()==2) {
+							/* Retrieve partner product information for the actual partner Id */
+							String dbTagQuery = "select product_type from products where netx_id='" + tagName + "' and   partner_id ='" + configMap.get("actual_partner_id") + "'";
+							
+							logger.info("dbTagQuery:" + dbTagQuery);
+							
+							map = new DbConnect().getConfigsFromSingleQuery(dbTagQuery);
+							if(map!=null && !map.isEmpty()){
+								replacedValue = map.get("product_type");
+							}
+						} 
+						
+						/* replace tags with tag value  */
+						else if (tagMap.containsKey(tagName) && !Strings.isNullOrEmpty(tagMapDTO.getTagValue())) {
+							String 	temp 			=  StringEscapeUtils.unescapeHtml(tagMapDTO.getTagValue());
+									temp			= CommonUtil.replaceDollarSign(temp);
+									replacedValue 	= temp;
+						} 
+						
+						/* replace tags with elements map (relay email) */
+						else if (!Strings.isNullOrEmpty(CommonUtil.getValueForMap(elementMap, tagName))) {
+							
+							String 	temp 			= StringEscapeUtils.unescapeHtml(elementMap.get(tagName));
+									temp 			= CommonUtil.replaceDollarSign(temp);
+									replacedValue	= temp;
+						}	
+						
+						/* replace value with VFTTND */
+						 else {
+							logger.info("value for " + tagName + " is not defined");
+							replacedValue = Constants.VFTTND;
+						}
+						
+						logger.info(tagName +" replaced by " + replacedValue);
+						
+						subject = subject.replaceAll("<<." + tagName + ">>", replacedValue);
+						content = content.replaceAll("<<." + tagName + ">>", replacedValue);
+					}
+				}
+			} while (content.contains("<<." + tag + ">>") || subject.contains("<<." + tag + ">>"));
+		}
+		
+		logger.info("Exiting generateActualContent -->" + content);
+		String[] arr = {subject,content};
+		return arr;
+	}
+	
+	
+	/**
+	 * Insert into email_logs.
+	 * @param parameterMap the hashmap of key,values to be inserted in email_logs
+	 * @return the id 
+	 */
+	public int insert(Map<String, String> parameterMap) {
+		logger.info("Entering insert");
+		
+		String	columns	= "";
+		String	val		= "";
+		
+		for (String key : parameterMap.keySet()) {
+			columns 	+= "`" + key + "`" + ",";
+			val 		+= "'" + parameterMap.get(key) + "'" + ",";
+		}
+		
+		columns 		= columns.substring(0, columns.lastIndexOf(','));
+		val 			= val.substring(0, val.lastIndexOf(','));
+		
+		return readEmailDAO.insetIntoDb(columns,val);
+		
+	
+	}
 	
 	/**
 	 * Delete the documents uploaded in temp directory.
@@ -544,7 +766,12 @@ public class ReadEmailService {
 		
 		logger.info("Exiting deleteFiles " );
 	}
-	
+
+
+
+	public void updateLogger(int insertId) {
+		 readEmailDAO.updateLogger(insertId);
+	}
 	
 
 }

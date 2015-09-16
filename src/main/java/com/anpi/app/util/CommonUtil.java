@@ -51,6 +51,20 @@ public class CommonUtil
 		return isEmpty;
 	}
 	
+	
+	/** Replace dollar sign */
+	public static String replaceDollarSign(String value) {
+		String replacedValue = "";
+		Pattern pattern = Pattern.compile("$");
+		Matcher matcher = pattern.matcher(value);
+		while (matcher.find()) {
+			System.out.println("matcher");
+			replacedValue = value.replaceAll("\\$", "\\\\\\$");
+		}
+		return replacedValue;
+	}
+	
+	
 	/**
 	 * Convert Date to utc string.
 	 */

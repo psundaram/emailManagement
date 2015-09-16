@@ -35,7 +35,6 @@ import org.springframework.stereotype.Component;
 import com.anpi.app.constants.Constants;
 import com.anpi.app.domain.EmailCredits;
 import com.anpi.app.service.ReadEmailService;
-import com.anpi.app.service.RelayEmailDAO;
 import com.anpi.app.util.CommonUtil;
 import com.anpi.app.util.UploadToDocRepo;
 import com.google.common.base.Strings;
@@ -45,8 +44,6 @@ public class ReadEmail {
 	
 	private static final Logger	logger						= Logger.getLogger(ReadEmail.class);
 	
-	@Autowired
-	RelayEmailDAO				relayEmailDAO;
 	@Autowired
 	ReadEmailService 			readEmailService;
 	
@@ -59,31 +56,22 @@ public class ReadEmail {
 	public Message				messageToBeSent				= null;
 	public Map<String, String>	elementsForMessage			= null;
 	public List<String>			uploadedUuids				= new ArrayList<String>();
-
+	
 	
 	static{
-		ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
-		ReadEmail readEmail = context.getBean(ReadEmail.class);
+		ApplicationContext	context		= new ClassPathXmlApplicationContext("applicationContext.xml");
+		ReadEmail			readEmail	= context.getBean(ReadEmail.class);
 		
-		EmailCredits emailCredits = new EmailCredits();
+		/* Relay SMTP server details */
+		EmailCredits 		emailCredits= new EmailCredits();
 		
 		emailCredits.setUsername("relay");
 		emailCredits.setPassword(Constants.RELAY_PASSWORD);
 		emailCredits.setPopHost(Constants.RELAY_HOST);
+		
 		readEmail.fetch(emailCredits);
 	}
 	
-	public static void main(String[] args) {
-		
-		EmailCredits emailCredits = new EmailCredits();
-		
-		emailCredits.setUsername("relay");
-		emailCredits.setPassword(Constants.RELAY_PASSWORD);
-		emailCredits.setPopHost(Constants.RELAY_HOST);
-		
-		new ReadEmail().fetch(emailCredits);
-	}
-
 	
 	/** 
 	 * This method fetches the email based on content_type from mail server,
@@ -100,6 +88,7 @@ public class ReadEmail {
 		
 		try {
 
+			/* Set smtp server configurations */
 			properties 	 = readEmailService.getProperties(emailCredits);
 			emailSession = Session.getDefaultInstance(properties);
 			
@@ -116,10 +105,11 @@ public class ReadEmail {
 			
 			logger.info("Number of messages to be popped--->" + messages.length);
 			
+			/*Loop through each messages */
 			for (Message message : messages) {
 				
 				filesToBeDeleted = new ArrayList<String>();
-				fileNames = new LinkedList<String>();
+				fileNames 		 = new LinkedList<String>();
 				
 				logger.info("Message Number that is being read ---> " + message.getMessageNumber());
 				
@@ -183,6 +173,7 @@ public class ReadEmail {
 			if (null != filesToBeDeleted && !filesToBeDeleted.isEmpty()) 
 				uploadFiles(filesToBeDeleted, partnerId);
 
+			/*Insert into emailLogs table */
 			int insertId = addLogger();
 			
 			/* If status = Active/forward, then send mail to the user and update
@@ -190,7 +181,7 @@ public class ReadEmail {
 			if (!configMap.isEmpty() && !configMap.get("status").equalsIgnoreCase("inactive")
 					&& null != messageToBeSent) {
 				readEmailService.sendMail(messageToBeSent,configMap,emailSession);
-				relayEmailDAO.updateLogger(insertId);
+				readEmailService.updateLogger(insertId);
 			}
 			
 			/* Deletes files from temp directory */
@@ -219,6 +210,7 @@ public class ReadEmail {
 	 * fetches the content of the message.
 	 */
 	public void writePart(Part p) throws Exception {
+		
 		if (p instanceof Message) { 
 			/* Prints FROM, TO, SUBJECT of the message  */
 			CommonUtil.writeEnvelope((Message) p); 
@@ -332,7 +324,7 @@ public class ReadEmail {
 			parameterMap.put("file_names", CommonUtil.convertToCsv(fileNames));
 		}
 		
-		int 					insertId 	 = relayEmailDAO.insert(parameterMap);
+		int 					insertId 	 = readEmailService.insert(parameterMap);
 		
 		logger.info("Exiting addLogger --> " + insertId);
 		return insertId;
@@ -404,7 +396,7 @@ public class ReadEmail {
 			newMessage.setRecipients(Message.RecipientType.BCC,
 					InternetAddress.parse(Constants.BCC_EMAIL_ADDRESS));
 			
-			String[] generatedString = relayEmailDAO.generateActualContent(elementsForMessage, configMap);
+			String[] generatedString = readEmailService.generateActualContent(elementsForMessage, configMap);
 			
 			if (!Strings.isNullOrEmpty(CommonUtil.getValueForMap(configMap,"subject"))) {
 				String subject = generatedString[0];
