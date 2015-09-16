@@ -54,6 +54,7 @@ public class URLReaderUtil {
 		return listOfParameter;
 	}
 	
+	
 	public static net.sf.json.JSONObject getJSONFromInputStream(InputStream inputStream)
 			throws IOException {
 		

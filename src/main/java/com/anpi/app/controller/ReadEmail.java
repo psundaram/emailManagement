@@ -1,4 +1,4 @@
-package com.anpi.app.config;
+package com.anpi.app.controller;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,6 +74,7 @@ public class ReadEmail {
 		new ReadEmail().fetch(emailCredits);
 	}
 
+
 	
 	/** 
 	 * This method fetches the email based on content_type from mail server,
@@ -81,23 +82,21 @@ public class ReadEmail {
 	 * mail server.
 	 */
 	public void fetch(EmailCredits emailCredits) {
-		
-		Store store;
-		Folder emailFolder;
-		String line = null;
-		Properties properties;
-
 		logger.info("Entering Fetch method");
+		
+		Store		store;
+		Folder		emailFolder;
+		String		line	= null;
+		Properties	properties;
 		
 		try {
 
-			properties = getProperties(emailCredits);
+			properties 	 = getProperties(emailCredits);
 			emailSession = Session.getDefaultInstance(properties);
 			
 			/* create the POP3 store object and connect with the pop server */
-			store = emailSession.getStore("pop3");
-			store.connect(emailCredits.getPopHost(), emailCredits.getUsername(),
-					emailCredits.getPassword());
+			store 		 = emailSession.getStore("pop3");
+			store.connect(emailCredits.getPopHost(), emailCredits.getUsername(),emailCredits.getPassword());
 			
 			/* create the folder object and open it */
 			emailFolder = store.getFolder("INBOX");
@@ -159,6 +158,7 @@ public class ReadEmail {
 		properties.put("mail.smtp.starttls.enable", "true");
 		properties.put("mail.smtp.host", "smtp.anpi.com");
 		properties.put("mail.smtp.port", "25");
+		
 		return properties;
 	}
 	
@@ -240,7 +240,7 @@ public class ReadEmail {
 				elementsForMessage = identifyElements(content);
 			}
 			
-			downloadAttachments(p, messageWithoutAttachment);
+			downloadAttachments(p);
 		}
 		
 		/* check if the content has attachment */
@@ -289,7 +289,7 @@ public class ReadEmail {
 					elementsForMessage = identifyElements(o.toString());
 				}
 				
-				downloadAttachments(p, messageWithoutAttachment);
+				downloadAttachments(p);
 			}
 			
 			else if (o instanceof InputStream) {
@@ -311,7 +311,7 @@ public class ReadEmail {
 					elementsForMessage = identifyElements(CommonUtil.getStringFromInputStream(is));
 				}
 				
-				downloadAttachments(p, messageWithoutAttachment);
+				downloadAttachments(p);
 			}
 			
 			else {
@@ -341,11 +341,11 @@ public class ReadEmail {
 		 * followed by the SetID and then PartnerID. If configuration is empty,
 		 * look configuration for other parameter */
 		
-		if (!Strings.isNullOrEmpty(orderId))
-			configMap = relayEmailDAO.getConfigForOrderId(orderId, emailName);
+//		if (!Strings.isNullOrEmpty(orderId))
+//			configMap = relayEmailDAO.getConfigForOrderId(orderId, emailName);
 		
-		if (checkConfigIsEmpty() && !Strings.isNullOrEmpty(customerId))
-			configMap = relayEmailDAO.getConfigForCustomerId(customerId, emailName);
+//		if (checkConfigIsEmpty() && !Strings.isNullOrEmpty(customerId))
+//			configMap = relayEmailDAO.getConfigForCustomerId(customerId, emailName);
 		
 		if (checkConfigIsEmpty() && !Strings.isNullOrEmpty(setId)) {
 			if (isLegacy != null && isLegacy.equalsIgnoreCase(Constants.Y))
@@ -695,7 +695,7 @@ public class ReadEmail {
 	/**
 	 * If message contains attachments, save it to temp directory
 	 */
-	public void downloadAttachments(Part p, Message messageWithoutAttachment)
+	public void downloadAttachments(Part p)
 			throws MessagingException, IOException {
 		logger.info("Entering createLocalFileForAttachments");
 		
@@ -708,8 +708,9 @@ public class ReadEmail {
 			MimeBodyPart mimeBodyPart = (MimeBodyPart) p;
 			
 			/* Creates Directory if not exists*/
-			if (!file.exists())
+			if (!file.exists()){
 				b = file.mkdirs();
+			}
 			
 			logger.info("Local directory for attaching file->" + file);
 			
@@ -753,9 +754,9 @@ public class ReadEmail {
 		logger.info("Send mail Partner Id:"  + partnerId);
 		
 		/* Use partner SMTP server setting for sending mail,if configured. */
-		if (getValueForConfig("smtp_applicable").equals("1")
-				&& !Strings.isNullOrEmpty(smtpServer) && !Strings.isNullOrEmpty(port)
-				&& !Strings.isNullOrEmpty(userName) && !Strings.isNullOrEmpty(password)) {
+		if ("1".equals(getValueForConfig("smtp_applicable")) && !Strings.isNullOrEmpty(smtpServer)
+				&& !Strings.isNullOrEmpty(port) && !Strings.isNullOrEmpty(userName)
+				&& !Strings.isNullOrEmpty(password)) {
 			
 			Properties props = new Properties();
 			props.put("mail.smtp.auth", "true");
@@ -779,7 +780,7 @@ public class ReadEmail {
 				System.out.println("Exception -->" + e.getMessage());
 			}
 			
-			/* If SMTP authentication failure occurs, send mail through default
+			/* If SMTP authentication fails, send mail through default
 			 * SMTP configuration and trigger a mail to account manager */
 			if (!t.isConnected()) {
 				t = emailSession.getTransport("smtp");
@@ -800,7 +801,7 @@ public class ReadEmail {
 	
 	
 	/**
-	 *  Incase of SMTP authentication failure, send mail to account manager
+	 *  If SMTP authentication fails, send mail to account manager
 	 */
 	public Message mailFailure(String accountManager) throws Exception
 	{
@@ -854,13 +855,15 @@ public class ReadEmail {
 	 * Get value corresponding to key from elementsForMessage(Relay email) map 
 	 */
 	public String getValueForElementsMap(String key) {
-		
+		System.out.println("Key:"+ key);
+		String value = "";
 		if (elementsForMessage.containsKey(key)
 				&& !Strings.isNullOrEmpty(elementsForMessage.get(key))) {
-			return elementsForMessage.get(key);
+			System.out.println(elementsForMessage.get(key));
+			value =  elementsForMessage.get(key);
 		}
 		
-		return "";
+		return value;
 	}
 	
 	
@@ -885,7 +888,6 @@ public class ReadEmail {
 		String 		value 			= getValueForElementsMap(key);
 		Address[] 	addressesArr	= null;
 		
-		System.out.println("value:" + value);
 		if (!Strings.isNullOrEmpty(value)) {
 			String[] addressArr = CommonUtil.extractAddr(value).split(";");
 			
@@ -899,7 +901,6 @@ public class ReadEmail {
 			
 			if (addressArr != null) {
 				addressesArr = new Address[addressArr.length];
-				System.out.println("length:" + addressArr.length);
 				for (int i = 0; i < addressArr.length; i++) {
 					if (key.equals("From") || key.equals("To")) {
 						String address = addressArr[i].split("@")[0].toString().toUpperCase();
@@ -911,7 +912,6 @@ public class ReadEmail {
 				}
 			}
 		}
-		System.out.println("addressesArr:" + addressesArr);
 		
 		return addressesArr;
 	}
@@ -926,7 +926,6 @@ public class ReadEmail {
 		String[]	emailArr	= null;
 		String		value		= getValueForConfig(configKey);
 		
-		System.out.println("value:"+ value);
 		if (!Strings.isNullOrEmpty(value) && (!value.contains("generated"))) {
 			addressArr = value.split(",");
 		}
@@ -939,8 +938,9 @@ public class ReadEmail {
 				emailArr = CommonUtil.extractAddr(emailAddress).split(";");
 			}
 			else {
-				if (elementKey.equals("To"))
+				if (elementKey.equals("To")){
 					emailArr = Constants.NOTIFICATION_EMAIL_ADDRESS.split(";");
+				}
 			}
 			
 			List<String> list = new ArrayList<String>(Arrays.asList(emailArr));

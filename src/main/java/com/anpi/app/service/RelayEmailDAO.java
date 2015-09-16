@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 
 import com.anpi.app.constants.Constants;
 import com.anpi.app.domain.TagMapDTO;
-import com.anpi.app.util.DbConnect;
+import com.anpi.app.dao.DbConnect;
 import com.anpi.app.util.CommonUtil;
 import com.anpi.app.util.URLReaderUtil;
 import com.google.common.base.Strings;
@@ -51,6 +51,7 @@ public class RelayEmailDAO {
 		Map<String, String>			apiMap			= new HashMap<String, String>();
 		String 						isPublished 	= getValueForMap(configMap, "is_published");
 		Map<String, String> 		map				= new HashMap<String, String>();
+		List<String>				dbTagList		= new ArrayList<String>();
 		
 		if (!configMap.isEmpty()) {
 			
@@ -83,6 +84,18 @@ public class RelayEmailDAO {
 			content 	= content.replaceAll("<<.SIGNATURE CONTENT>>", signature);
 		} else {
 			content 	= content.replaceAll("<<.SIGNATURE CONTENT>>", "");
+		}
+		
+		for (String tagName : tagMap.keySet()) {
+			TagMapDTO tagMapDTO = tagMap.get(tagName);
+			if(tagMapDTO.getSource().equals("2")){
+				dbTagList.add(tagMapDTO.getTagValue());
+			}
+		}
+		
+		if(dbTagList!=null && !dbTagList.isEmpty()){
+			String dbTagQuery = "select netx_id,product_type from products where netx_id in ('" + dbTagList + "' ) and   partner_id ='" + configMap.get("actual_partner_id") + "'";
+			System.out.println("dbTagQuery :" + dbTagQuery);
 		}
 		
 		for (String tag : tagMap.keySet()) {
@@ -251,8 +264,8 @@ public class RelayEmailDAO {
 		}
 		
 		else {
-			setID 		= partnerMap.get("");
-			partnerId 	= getValueForMap(partnerMap, "partner_id");
+			setID 		= partnerMap.get("partner_id");
+			partnerId 	= getValueForMap(partnerMap, "id");
 		}
 		
 		logger.info("SetID:" + setID + "partnerId:" + partnerId);
@@ -263,8 +276,8 @@ public class RelayEmailDAO {
 		String query2 = "select cc_email,reply_to_email from email_configs_opt_vw where setId='"
 				+ setID + "' AND email_name='" + emailName + "'  AND customer_id=-1";
 		
-		String query = query1 + "###" + query2;
-		configMap = new DbConnect().getConfigsFromMultipleQuery(query.split("###"));
+		String 	query 		= query1 + "###" + query2;
+				configMap	= new DbConnect().getConfigsFromMultipleQuery(query.split("###"));
 		
 		if(configMap!=null && !configMap.isEmpty()){
 			configMap.put("actual_partner_id",partnerId);
