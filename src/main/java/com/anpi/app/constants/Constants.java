@@ -30,7 +30,8 @@ public class Constants {
 	public static final String	MYSQL_PWD					= PropUtils.getVal("mail.jdbc.password");
 	public static final String	DOC_REPO_PATH				= PropUtils.getVal("mail.upload.url");
 	public static final String	TEMP_DIR_ATTACHMENTS		= PropUtils.getVal("mail.directory.attachments");
-	public static final String	BCC_EMAIL_ADDRESS			= PropUtils.getVal("mail.bcc.address");
+	public static final String	BCC_EMAIL_ADDRESS			= "";
+//			PropUtils.getVal("mail.bcc.address");
 	public static final String	API_CALL_URL				= PropUtils.getVal("api.call.url");
 	public static final String	PARTNER_SMTP_DETAILS		= PropUtils.getVal("smtp.server.url");
 	 

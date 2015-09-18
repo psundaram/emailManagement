@@ -323,7 +323,7 @@ public class ReadEmailService {
 	/**
 	 * Get addressArr for composing message(Status - FORWARD/INACTIVE)
 	 */
-	public Address[] getAddressArrFromElementsMap(String key,Map<String,String> elementsMap,Map<String,String> configMap) throws Exception {
+	public Address[] getAddressArrFromElementsMap(String key,Map<String,String> elementsMap,String status) throws Exception {
 		
 		String 		value 			= CommonUtil.getValueForMap(elementsMap,key);
 		Address[] 	addressesArr	= null;
@@ -331,9 +331,7 @@ public class ReadEmailService {
 		if (!Strings.isNullOrEmpty(value)) {
 			String[] addressArr = CommonUtil.extractAddr(value).split(";");
 			
-			if ("To".equals(key) && !configMap.isEmpty()
-					&& configMap.get("status").equalsIgnoreCase("forward")
-					&& addressArr.length == 0) {
+			if ("To".equals(key) && "forward".equalsIgnoreCase(status) && addressArr.length == 0) {
 				addressArr = Constants.NOTIFICATION_EMAIL_ADDRESS.split(";");
 			}
 			
@@ -356,13 +354,15 @@ public class ReadEmailService {
 	
 	
 	/**
-	 * Get addressArr for composing message(Status - ACTIVE)
+	 * Get addressArr from config map. If configMap contains key generate, then
+	 * use address value of relay email
 	 */
-	public Address[] getAddressForActiveStatus(String configKey, String elementKey,Map<String,String> elementsMap,Map<String,String> configMap) throws AddressException {
+	public Address[] getAddressFromConfig(String configKey, String elementKey,Map<String,String> elementsMap,Map<String,String> configMap) throws AddressException {
 		
 		String[]	addressArr	= null; 
 		String[]	emailArr	= null;
 		String		value		= CommonUtil.getValueForMap(configMap,configKey);
+		
 		
 		if (!Strings.isNullOrEmpty(value) && (!value.contains("generated"))) {
 			addressArr = value.split(",");
@@ -382,8 +382,8 @@ public class ReadEmailService {
 			List<String> list = new ArrayList<String>(Arrays.asList(emailArr));
 			list.addAll(Arrays.asList(confArr));
 			
+			/*Remove the String "generated" from the address list*/ 
 			while(list.remove("generated")){
-				//do nothing
 			}
 			
 			Object[] obj = list.toArray();
@@ -584,7 +584,7 @@ public class ReadEmailService {
 	 * API call, Tag map or relay email.
 	 */
 	public String[] generateActualContent(Map<String, String> elementMap, Map<String, String> configMap) throws SQLException, JSONException, IOException {
-		logger.info("Entering generateActualContent");
+		logger.info( "Entering generateActualContent");
 		
 		String						content			= null;
 		String						subject			= null;

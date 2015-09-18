@@ -49,7 +49,6 @@ public class ReadEmail {
 	
 	public Session				emailSession				= null;
 	public String				messageContentFinal			= null;
-	public Message				newMessage					= null;
 	public Map<String, String>	configMap					= null;
 	public List<String>			filesToBeDeleted			= null;
 	public LinkedList<String>	fileNames					= null;
@@ -80,7 +79,7 @@ public class ReadEmail {
 	 * mail server.
 	 */
 	public void fetch(EmailCredits emailCredits) {
-		logger.info("Entering Fetch method");
+		logger.info(new Object(){}.getClass() + " "  + new Object(){}.getClass().getEnclosingMethod().getName() + "Entering Fetch method");
 		
 		Store		store;
 		Folder		emailFolder;
@@ -157,14 +156,20 @@ public class ReadEmail {
 		String partnerId = "1";
 		try
 		{
-			/* Process the message based on the content-type */
+			/*
+			 * Process the message based on the content-type. Forming
+			 * elementsForMessage map and download attachments
+			 */
 			writePart(message);
 			
 			/* Fetch configuration based on the email name */
 			configMap = readEmailService.getConfiguration(elementsForMessage);
 			
 			/* Compose message with all attachments */
-			messageToBeSent = createMessage(message,elementsForMessage, configMap);
+			Message newMessage = createMessage(message,elementsForMessage, configMap);
+			
+			/** Add attachments if exist */
+			messageToBeSent = readEmailService.createMessageWithAllAttachments(message, newMessage,emailSession,filesToBeDeleted);
 			
 			/* Upload files to doc Repository */
 			if (!Strings.isNullOrEmpty(CommonUtil.getValueForMap(elementsForMessage,"partner_id"))){
@@ -175,7 +180,7 @@ public class ReadEmail {
 				uploadFiles(filesToBeDeleted, partnerId);
 
 			/*Insert into emailLogs table */
-			int insertId = addLogger();
+			int insertId = addLogger(newMessage);
 			
 			/* If status = Active/forward, then send mail to the user and update
 			 * the email log table */
@@ -224,13 +229,8 @@ public class ReadEmail {
 			logger.info("Plain text Email");
 			
 			String content = (String) p.getContent();
-			if (null == p.getDisposition()
-					|| ((null != p.getDisposition()) && (!p.getDisposition().equalsIgnoreCase(
-							Part.ATTACHMENT)))) {
-				elementsForMessage = readEmailService.identifyElements(content);
-			}
+			elementsForMessage = readEmailService.identifyElements(content);
 			
-			downloadAttachments(p);
 		}
 		
 		/* check if the content has attachment */
@@ -256,7 +256,7 @@ public class ReadEmail {
 			writePart((Part) p.getContent());
 		}
 		
-		/* check if the content is an inline image */
+		/* check if the content is an image */
 		else if (p.getContentType().contains("image/")) {
 			
 			if (Part.ATTACHMENT.equalsIgnoreCase(p.getDisposition())) {
@@ -264,6 +264,7 @@ public class ReadEmail {
 				MimeBodyPart mimeBodyPart = (MimeBodyPart) p;
 				mimeBodyPart.saveFile(fileName);
 				filesToBeDeleted.add(fileName);
+				fileNames.add(mimeBodyPart.getFileName().trim());
 			}
 			
 		}
@@ -314,7 +315,7 @@ public class ReadEmail {
 	/**
 	 * Inserts values into email_log table.
 	 */
-	public int addLogger() throws MessagingException {
+	public int addLogger(Message newMessage) throws MessagingException {
 		logger.info("Entering addLogger");
 		
 		/* Generate the map for the logs to be added.*/
@@ -339,7 +340,7 @@ public class ReadEmail {
 		logger.info("Entering createMessageOnly");
 		
 		String	content		= null;
-				newMessage	= new MimeMessage(emailSession);
+		Message	newMessage	= new MimeMessage(emailSession);
 		String	status		= CommonUtil.getValueForMap(configMap,"status");
 		String	useConfig	= CommonUtil.getValueForMap(elementsForMessage,"UseConfig");
 		
@@ -350,19 +351,19 @@ public class ReadEmail {
 				|| "forward".equalsIgnoreCase(status) || ("ask".equalsIgnoreCase(status)
 				&& "no".equalsIgnoreCase(useConfig))) {
 			
-			Address[] fromAddressArr = readEmailService.getAddressArrFromElementsMap("From",elementsForMessage,configMap);
+			Address[] fromAddressArr = readEmailService.getAddressArrFromElementsMap("From",elementsForMessage,status);
 			newMessage.setFrom(fromAddressArr[0]);
 			
-			Address[] toAddressesArr = readEmailService.getAddressArrFromElementsMap("To",elementsForMessage,configMap);
+			Address[] toAddressesArr = readEmailService.getAddressArrFromElementsMap("To",elementsForMessage,status);
 			newMessage.setRecipients(Message.RecipientType.TO, toAddressesArr);
 
-			Address[] ccAddressesArr = readEmailService.getAddressArrFromElementsMap("CC",elementsForMessage,configMap);
+			Address[] ccAddressesArr = readEmailService.getAddressArrFromElementsMap("CC",elementsForMessage,status);
 			newMessage.setRecipients(Message.RecipientType.CC, ccAddressesArr);
 			
 			InternetAddress bccList[] = InternetAddress.parse(Constants.BCC_EMAIL_ADDRESS);
 			newMessage.setRecipients(Message.RecipientType.BCC, bccList);
 			
-			Address[] replyToAddressesArr = readEmailService.getAddressArrFromElementsMap("ReplyTo",elementsForMessage,configMap);
+			Address[] replyToAddressesArr = readEmailService.getAddressArrFromElementsMap("ReplyTo",elementsForMessage,status);
 			newMessage.setReplyTo(replyToAddressesArr);
 				
 			newMessage.setSubject(StringEscapeUtils.unescapeHtml(CommonUtil.getValueForMap(elementsForMessage,"Subject")));
@@ -377,7 +378,7 @@ public class ReadEmail {
 			content = StringEscapeUtils.unescapeHtml(content);
 			
 		}
-		/* Read values from the DB and create the new message */
+		/* Read values from the DB(config map) and create the new message */
 		else {
 			
 			String fromEmailValue = CommonUtil.getValueForMap(configMap,"from_email");
@@ -388,12 +389,18 @@ public class ReadEmail {
 			 else
 				fromAddress = CommonUtil.getValueForMap(elementsForMessage,"From");
 			
-			newMessage.setFrom(new InternetAddress(fromAddress.toString(), fromAddress.split("@")[0].toString().toUpperCase()));
-			newMessage.setRecipients(Message.RecipientType.TO,
-					readEmailService.getAddressForActiveStatus("to_email", "To",elementsForMessage,configMap));
-			newMessage.setRecipients(Message.RecipientType.CC,
-					readEmailService.getAddressForActiveStatus("cc_email", "CC",elementsForMessage,configMap));
-			newMessage.setReplyTo(readEmailService.getAddressForActiveStatus("reply_to_email", "ReplyTo",elementsForMessage,configMap));
+			newMessage.setFrom(new InternetAddress(fromAddress.toString(),
+					fromAddress.split("@")[0].toString().toUpperCase()));
+			
+			newMessage.setRecipients(Message.RecipientType.TO, readEmailService
+					.getAddressFromConfig("to_email", "To", elementsForMessage, configMap));
+			
+			newMessage.setRecipients(Message.RecipientType.CC, readEmailService
+					.getAddressFromConfig("cc_email", "CC", elementsForMessage, configMap));
+			
+			newMessage.setReplyTo(readEmailService.getAddressFromConfig("reply_to_email",
+					"ReplyTo", elementsForMessage, configMap));
+			
 			newMessage.setRecipients(Message.RecipientType.BCC,
 					InternetAddress.parse(Constants.BCC_EMAIL_ADDRESS));
 			
@@ -425,10 +432,7 @@ public class ReadEmail {
 		newMessage.setContent(content, "text/html");
 		newMessage.saveChanges();
 		
-		/** Add attachments if exist */
-		Message messageSent = readEmailService.createMessageWithAllAttachments(message, newMessage,emailSession,filesToBeDeleted);
-		
-		return messageSent;
+		return newMessage;
 	}
 	
 	
