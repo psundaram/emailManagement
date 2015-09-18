@@ -95,8 +95,10 @@ public class ReadEmailDAO {
 	
 	/**
 	 *  Insert into email_logs table
+	 * @throws SQLException 
+	 * @throws  
 	 */
-	public int insetIntoDb(String columns, String val) {
+	public int insetIntoDb(String columns, String val) throws SQLException {
 		
 		String sql = "INSERT INTO email_logs (" + columns + ") VALUES (" + val + ");";
 		
@@ -107,8 +109,9 @@ public class ReadEmailDAO {
 	/**
 	 * Updates sending status from created to sent.
 	 * @param id the id
+	 * @throws SQLException 
 	 */
-	public void updateLogger(int emailId) {
+	public void updateLogger(int emailId) throws SQLException {
 		
 		String sql = "UPDATE email_logs SET sending_status='Sent' WHERE id=" + emailId;
 		dbConnect.updateLogs(sql);

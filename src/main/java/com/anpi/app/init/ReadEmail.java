@@ -3,6 +3,7 @@ package com.anpi.app.init;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -142,7 +143,8 @@ public class ReadEmail {
 			store.close();
 		}
 		catch (Exception e) {
-			e.printStackTrace();
+			
+			logger.error("An error occurred", e);
 		}
 	}
 
@@ -200,7 +202,7 @@ public class ReadEmail {
 		}
 		catch (Exception e)
 		{
-			logger.info("Exception" + e.getMessage() + "\nFull exception:" + e);
+			logger.error("An error occurred", e);
 			
 			return "no";
 		}
@@ -314,8 +316,9 @@ public class ReadEmail {
 	
 	/**
 	 * Inserts values into email_log table.
+	 * @throws SQLException 
 	 */
-	public int addLogger(Message newMessage) throws MessagingException {
+	public int addLogger(Message newMessage) throws MessagingException, SQLException {
 		logger.info("Entering addLogger");
 		
 		/* Generate the map for the logs to be added.*/

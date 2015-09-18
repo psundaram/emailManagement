@@ -440,7 +440,7 @@ public class ReadEmailService {
 			}
 			catch (Exception e) {
 				e.printStackTrace();
-				logger.info("Exception -->" + e);
+				logger.error("An error occurred", e);
 			}
 			
 			/* If SMTP authentication fails, send mail through default
@@ -716,8 +716,9 @@ public class ReadEmailService {
 	 * Insert into email_logs.
 	 * @param parameterMap the hashmap of key,values to be inserted in email_logs
 	 * @return the id 
+	 * @throws SQLException 
 	 */
-	public int insert(Map<String, String> parameterMap) {
+	public int insert(Map<String, String> parameterMap) throws SQLException {
 		logger.info("Entering insert");
 		
 		String	columns	= "";
@@ -764,8 +765,9 @@ public class ReadEmailService {
 	
 	/**
 	 * Update mail_sent status to "SENT" in email_logs table
+	 * @throws SQLException 
 	 */
-	public void updateLogger(int insertId) {
+	public void updateLogger(int insertId) throws SQLException {
 		 readEmailDAO.updateLogger(insertId);
 	}
 	

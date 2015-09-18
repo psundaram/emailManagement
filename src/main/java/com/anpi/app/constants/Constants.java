@@ -32,7 +32,9 @@ public class Constants {
 	public static final String	TEMP_DIR_ATTACHMENTS		= PropUtils.getVal("mail.directory.attachments");
 	public static final String	BCC_EMAIL_ADDRESS			= "";
 //			PropUtils.getVal("mail.bcc.address");
-	public static final String	API_CALL_URL				= PropUtils.getVal("api.call.url");
-	public static final String	PARTNER_SMTP_DETAILS		= PropUtils.getVal("smtp.server.url");
+	public static final String	API_CALL_URL				= "http://apilb.dev.anpi.com/partner/api/basic_branding_infos/get_partner_infos?";
+			//PropUtils.getVal("api.call.url");
+	public static final String	PARTNER_SMTP_DETAILS		= "http://10.7.3.22:8080/partner/api/";
+	//PropUtils.getVal("smtp.server.url");
 	 
 }
