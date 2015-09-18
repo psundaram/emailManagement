@@ -58,7 +58,6 @@ public class CommonUtil
 		Pattern pattern = Pattern.compile("$");
 		Matcher matcher = pattern.matcher(value);
 		while (matcher.find()) {
-			System.out.println("matcher");
 			replacedValue = value.replaceAll("\\$", "\\\\\\$");
 		}
 		return replacedValue;

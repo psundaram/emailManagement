@@ -6,6 +6,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -201,6 +202,30 @@ public class DbConnect {
         	tagMapDTO.setSource(rs.getInt("source"));
         	tagMapDTO.setTagValue(rs.getString("tag_value"));
             resultMap.put(rs.getString("tag_name"), tagMapDTO);
+        }
+        
+        con.close();
+
+        logger.info("Exiting getTags");
+        return resultMap;
+    }
+   
+    
+    /**
+	 * Retrieve products corresponding to the netxId
+	 */
+    public Map<String,String> getProducts(String query) throws SQLException{
+    	logger.info("Entering products");
+    	
+    	DbConnect					dbConnect	= new DbConnect();
+    	Connection					con			= dbConnect.createConnection();
+    	Statement					stmt		= con.createStatement();
+    	ResultSet					rs			= stmt.executeQuery(query);
+    	Map<String, String>			resultMap	= new HashMap<String, String>();
+    	
+        while(rs.next()){
+        	
+            resultMap.put(rs.getString("netx_id"), rs.getString("product_type"));
         }
         
         con.close();

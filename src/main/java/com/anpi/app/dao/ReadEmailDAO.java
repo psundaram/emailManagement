@@ -7,6 +7,7 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import com.anpi.app.domain.TagMapDTO;
 import com.anpi.app.util.DbConnect;
@@ -86,9 +87,9 @@ public class ReadEmailDAO {
 	 */
 	public Map<String,String> getProductDetails(List<String> netxIds, String partnerId) throws SQLException{
 	
-		String query = "select netx_id,product_type from products where netx_id in ('" + netxIds + "' ) and   partner_id ='" + partnerId + "'";
+		String query = "select netx_id,product_type from products where netx_id in (" + StringUtils.collectionToCommaDelimitedString(netxIds) + ") and   partner_id ='" + partnerId + "'";
 		
-		return dbConnect.getConfigsFromSingleQuery(query);
+		return dbConnect.getProducts(query);
 	}
 
 	

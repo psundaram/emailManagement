@@ -440,7 +440,7 @@ public class ReadEmailService {
 			}
 			catch (Exception e) {
 				e.printStackTrace();
-				System.out.println("Exception -->" + e.getMessage());
+				logger.info("Exception -->" + e);
 			}
 			
 			/* If SMTP authentication fails, send mail through default
@@ -628,9 +628,11 @@ public class ReadEmailService {
 		
 		/* Special handling for product tags. If tagMap.source equals 2, then query product table */
 		for (String tagName : tagMap.keySet()) {
+			
 			TagMapDTO tagMapDTO = tagMap.get(tagName);
-			if(tagMapDTO.getSource().equals("2")){
-				dbTagList.add(tagMapDTO.getTagValue());
+			
+			if(tagMapDTO.getSource()==2){
+				dbTagList.add(tagName);
 			}
 		}
 		
@@ -668,7 +670,6 @@ public class ReadEmailService {
 							}
 						}
 						
-						//TODO - To check 
 						/* CONDITION TO HANDLE DB TAGS */
 						else if (tagMap.containsKey(tagName) && tagMapDTO.getSource()==2 && !Strings.isNullOrEmpty(CommonUtil.getValueForMap(dbTagMap, tagName))) {
 							
