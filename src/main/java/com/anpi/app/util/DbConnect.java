@@ -24,6 +24,7 @@ public class DbConnect {
 	/** Logging for DBconnect */
 	private static final Logger logger = Logger.getLogger(DbConnect.class);
 	
+	
    /**
     * Creates the database connection.
     * @return the connection
@@ -36,7 +37,7 @@ public class DbConnect {
 					Constants.MYSQL_UNAME, Constants.MYSQL_PWD);
 		}
 		catch (Exception e) {
-			e.printStackTrace();
+			logger.error("error occured",e);
 		}
 		return connection;
 	}
@@ -63,7 +64,8 @@ public class DbConnect {
 				resultMap.put(rsMeta.getColumnName(i), rs.getString(i));
 			}
 		}
-		
+		rs.close();
+		stmt.close();
 		con.close();
 		
 		logger.info("Exiting getConfigsFromSingleQuery");
@@ -103,7 +105,8 @@ public class DbConnect {
                 }
             }
         }
-        con.close();
+        stmt.close();
+		con.close();
         
         logger.info("Exiting getConfigsFromMultipleQuery");
         return resultMap;
@@ -112,15 +115,16 @@ public class DbConnect {
    
     /**
 	 * Inserts the mail content into email_logs 
+     * @throws SQLException 
 	 */
-    public int putLogs(String sql) {
+    public int putLogs(String sql) throws SQLException {
     	logger.info("entering putlogs");
     	
     	boolean		success		= false;
     	int			insertId	= 0;
     	DbConnect	dbConnect	= new DbConnect();
     	Connection	con			= dbConnect.createConnection();
-    	Statement	stmt;
+    	Statement	stmt	    = null;
     	
     	try {
     				stmt 		= con.createStatement();
@@ -134,16 +138,12 @@ public class DbConnect {
     		
     	} catch (SQLException ex) {
     		
-    		logger.info("Exception : " + ex );
+    		logger.error("error occured : " , ex );
     		
     	} finally {
-    		// Close connections be handled as functions with exception handling.
-    		try {
-    			con.close();
-    		} catch (SQLException ex) {
+    		stmt.close();
+			con.close();
     			
-    			logger.info("Exception : " + ex );
-    		}
     	}
     	
     	logger.info("exiting putlogs-->"+insertId);
@@ -153,14 +153,15 @@ public class DbConnect {
     
     /**
 	 * Updates the status of mail from created to sent once the mail is sent.
+     * @throws SQLException 
 	 */
-    public boolean updateLogs(String sql) {
+    public boolean updateLogs(String sql) throws SQLException {
     	logger.info("Entering updateLogs");
     	
     	boolean		success		= false;
     	DbConnect	dbConnect	= new DbConnect();
     	Connection	con			= dbConnect.createConnection();
-    	Statement	stmt;
+    	Statement	stmt 		= null;
     	
     	try {
     		
@@ -170,15 +171,11 @@ public class DbConnect {
     		
     	} catch (SQLException ex) {
     		logger.info("Exception : "+ex);
-    	} finally {
-    		//  Close connections be handled as functions with exception handling.
-    		try {
-    			con.close();
-    		} catch (SQLException ex) {
-    			
-    			logger.info("Exception"+ex.getMessage());
-    		}
-    	}
+		}
+		finally {
+			stmt.close();
+			con.close();
+		}
     	logger.info("Exiting updateLogs-->"+success);
     	return success;
     }
@@ -204,6 +201,8 @@ public class DbConnect {
             resultMap.put(rs.getString("tag_name"), tagMapDTO);
         }
         
+        rs.close();
+        stmt.close();
         con.close();
 
         logger.info("Exiting getTags");
@@ -228,6 +227,8 @@ public class DbConnect {
             resultMap.put(rs.getString("netx_id"), rs.getString("product_type"));
         }
         
+        rs.close();
+        stmt.close();
         con.close();
 
         logger.info("Exiting getTags");
